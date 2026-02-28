@@ -95,3 +95,44 @@ test('never throws on any input', () => {
   assert.doesNotThrow(() => tokenize('<?no close'));
   assert.doesNotThrow(() => tokenize('random text with no tags'));
 });
+
+test('tokenizes text with no following tag as a text node', () => {
+  const tokens = tokenize('just some text');
+  assert.equal(tokens.length, 1);
+  assert.equal(tokens[0].type, TokenType.TEXT);
+  assert.equal(tokens[0].value, 'just some text');
+});
+
+test('skips whitespace-only text between tags', () => {
+  const tokens = tokenize('<a>   </a>');
+  const textTokens = tokens.filter(t => t.type === TokenType.TEXT);
+  assert.equal(textTokens.length, 0);
+});
+
+test('tokenizes a processing instruction with no attributes', () => {
+  const tokens = tokenize('<?xml?>');
+  assert.equal(tokens.length, 1);
+  assert.equal(tokens[0].type, TokenType.PROCESSING_INSTRUCTION);
+  assert.equal(tokens[0].target, 'xml');
+});
+
+test('tokenizes an unclosed processing instruction as malformed', () => {
+  const tokens = tokenize('<?xml no closing');
+  assert.equal(tokens.length, 1);
+  assert.equal(tokens[0].type, TokenType.MALFORMED);
+  assert.equal(tokens[0].raw, '<?xml no closing');
+});
+
+test('tokenizes an unclosed comment as malformed', () => {
+  const tokens = tokenize('<!-- no closing');
+  assert.equal(tokens.length, 1);
+  assert.equal(tokens[0].type, TokenType.MALFORMED);
+  assert.equal(tokens[0].raw, '<!-- no closing');
+});
+
+test('tokenizes an unclosed cdata section as malformed', () => {
+  const tokens = tokenize('<![CDATA[no closing');
+  assert.equal(tokens.length, 1);
+  assert.equal(tokens[0].type, TokenType.MALFORMED);
+  assert.equal(tokens[0].raw, '<![CDATA[no closing');
+});

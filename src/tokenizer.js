@@ -32,20 +32,26 @@ function nextToken(xml, position) {
   const next = xml[position + 1];
 
   if (next === '?') {
-    const end = xml.indexOf('?>', position) + 2;
+    const closeIndex = xml.indexOf('?>', position);
+    if (closeIndex === -1) return { token: { type: TokenType.MALFORMED, raw: xml.slice(position) }, end: xml.length };
+    const end = closeIndex + 2;
     const inner = xml.slice(position + 2, end - 2).trim();
     const space = inner.search(WHITESPACE);
-    return { token: { type: TokenType.PROCESSING_INSTRUCTION, target: space === -1 ? inner : inner.slice(0, space), attributes: parseAttributes(inner) }, end: end || xml.length };
+    return { token: { type: TokenType.PROCESSING_INSTRUCTION, target: space === -1 ? inner : inner.slice(0, space), attributes: parseAttributes(inner) }, end };
   }
 
   if (next === '!' && xml[position + 2] === '-') {
-    const end = xml.indexOf('-->', position) + 3;
-    return { token: { type: TokenType.COMMENT, value: xml.slice(position + 4, end - 3) }, end: end || xml.length };
+    const closeIndex = xml.indexOf('-->', position);
+    if (closeIndex === -1) return { token: { type: TokenType.MALFORMED, raw: xml.slice(position) }, end: xml.length };
+    const end = closeIndex + 3;
+    return { token: { type: TokenType.COMMENT, value: xml.slice(position + 4, end - 3) }, end };
   }
 
   if (next === '!' && xml[position + 2] === '[') {
-    const end = xml.indexOf(']]>', position) + 3;
-    return { token: { type: TokenType.CDATA, value: xml.slice(position + 9, end - 3) }, end: end || xml.length };
+    const closeIndex = xml.indexOf(']]>', position);
+    if (closeIndex === -1) return { token: { type: TokenType.MALFORMED, raw: xml.slice(position) }, end: xml.length };
+    const end = closeIndex + 3;
+    return { token: { type: TokenType.CDATA, value: xml.slice(position + 9, end - 3) }, end };
   }
 
   const end = xml.indexOf('>', position) + 1;

@@ -14,7 +14,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "test": "node --test tests/tokenizer.test.js tests/parser.test.js"
+    "test": "node --test tests/tokenizer.test.js tests/parser.test.js",
+    "coverage": "node --experimental-test-coverage --test tests/tokenizer.test.js tests/parser.test.js"
   },
   "keywords": [
     "xml",
