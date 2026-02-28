@@ -28,10 +28,10 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jpatterson933/xml-2-html.git"
+    "url": "git+https://github.com/jpatterson933/xml-to-html-converter.git"
   },
   "bugs": {
-    "url": "https://github.com/jpatterson933/xml-2-html/issues"
+    "url": "https://github.com/jpatterson933/xml-to-html-converter/issues"
   },
-  "homepage": "https://github.com/jpatterson933/xml-2-html#readme"
+  "homepage": "https://github.com/jpatterson933/xml-to-html-converter#readme"
 }

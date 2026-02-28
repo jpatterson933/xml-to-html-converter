@@ -1,10 +1,10 @@
 # xml-to-html-converter
 
-![npm version](https://img.shields.io/npm/v/xml-to-html-converter)
-![npm downloads](https://img.shields.io/npm/dw/xml-to-html-converter)
-![license](https://img.shields.io/npm/l/xml-to-html-converter)
+![version](https://img.shields.io/badge/version-0.1.1-blue)
 ![node version](https://img.shields.io/node/v/xml-to-html-converter)
 ![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+![XML](https://img.shields.io/badge/input-XML-orange)
+![HTML](https://img.shields.io/badge/output-HTML-red)
 
 A zero-dependency Node.js package for converting XML to HTML. Currently in pre-1.0.0 development, building the foundation one functional part at a time. Full XML-to-HTML conversion is the goal of `v1.0.0`, but for now, I will be building 0 dependency tools that will eventually be used to convert an xml to html.
 
@@ -156,6 +156,6 @@ const tree = parse("<root><unclosed><valid>text</valid></root>");
 
 Node.js `>=18.0.0`
 
-## License
+---
 
-ISC
+![license](https://img.shields.io/badge/license-ISC-green)
