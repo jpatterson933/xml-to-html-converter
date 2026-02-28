@@ -1,12 +1,2 @@
-export { parse } from './parser';
-export type {
-  DocumentNode,
-  ElementNode,
-  TextNode,
-  CommentNode,
-  CDataNode,
-  ProcessingInstructionNode,
-  MalformedNode,
-  Node,
-} from './parser';
-export type { Token, TokenTypeValue } from './tokenizer';
+export { scaffold } from "./modules/scaffold/scaffold";
+export type { Token, TokenRole } from "./modules/scaffold/types";

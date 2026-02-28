@@ -10,5 +10,4 @@ export default defineConfig({
   sourcemap: false,
   clean: true,
   target: "node20",
-  shims: true,
 });
