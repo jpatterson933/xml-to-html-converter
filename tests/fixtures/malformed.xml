@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <unclosed>
+  <proper>this one closes</proper>
+  <also-unclosed>
+    <deep>text inside deep</deep>
+  </also-unclosed>
+  <stray-close-tag />
+  </unexpected>
+  </root-mismatch>
+  <normal>this is fine</normal>
+</root>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document>
+  <code><![CDATA[function greet(name) { return "<h1>Hello, " + name + "</h1>"; }]]></code>
+  <description><![CDATA[Use <b>bold</b> & "quotes" freely inside CDATA]]></description>
+  <math><![CDATA[x < y && y > z]]></math>
+</document>

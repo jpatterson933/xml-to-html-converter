@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This is a top-level comment -->
+<library>
+  <!-- Section: fiction -->
+  <section name="fiction">
+    <book>
+      <!-- Author is unknown -->
+      <title>Anonymous Tales</title>
+    </book>
+  </section>
+  <!-- Section: non-fiction -->
+  <section name="non-fiction">
+    <book>
+      <title>The Art of War</title>
+      <!-- Written circa 500 BC -->
+    </book>
+  </section>
+</library>
