@@ -1,9 +1,10 @@
 export type XmlNodeRole =
-  | "openTag"
   | "closeTag"
-  | "selfTag"
-  | "processingInstruction"
   | "comment"
+  | "doctype"
+  | "openTag"
+  | "processingInstruction"
+  | "selfTag"
   | "textLeaf";
 
 export interface XmlNode {
@@ -13,6 +14,12 @@ export interface XmlNode {
   localIndex: number;
   children?: XmlNode[];
   malformed?: true;
+}
+
+export type MalformedXmlNode = XmlNode & { malformed: true };
+
+export function isMalformed(node: XmlNode): node is MalformedXmlNode {
+  return node.malformed === true;
 }
 
 export interface XmlNodeData {

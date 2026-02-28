@@ -1,2 +1,7 @@
 export { scaffold } from "./modules/scaffold/scaffold";
-export type { XmlNode, XmlNodeRole } from "./modules/scaffold/types";
+export { isMalformed } from "./modules/scaffold/types";
+export type {
+  MalformedXmlNode,
+  XmlNode,
+  XmlNodeRole,
+} from "./modules/scaffold/types";

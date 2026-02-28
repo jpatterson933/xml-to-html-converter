@@ -17,6 +17,11 @@ function collectXmlNodes(
   while (position < xml.length) {
     const xmlNodeData = extractXmlNodes(xml, position);
 
+    if (xmlNodeData.role === "textLeaf" && xmlNodeData.raw.trim() === "") {
+      position = xmlNodeData.end;
+      continue;
+    }
+
     if (xmlNodeData.role === "closeTag") {
       if (xmlNodeData.tag === parentTag)
         return { xmlNodes, position: xmlNodeData.end, closed: true };
@@ -69,6 +74,21 @@ function collectXmlNodes(
   return { xmlNodes, position, closed: parentTag === null };
 }
 
+function findTagClose(xml: string, position: number): number {
+  let i = position;
+  while (i < xml.length) {
+    const ch = xml[i];
+    if (ch === '"' || ch === "'") {
+      const closeQuote = xml.indexOf(ch, i + 1);
+      i = closeQuote === -1 ? xml.length : closeQuote + 1;
+      continue;
+    }
+    if (ch === ">") return i;
+    i++;
+  }
+  return -1;
+}
+
 function extractXmlNodes(xml: string, position: number): XmlNodeData {
   if (xml[position] !== "<") {
     const end = xml.indexOf("<", position);
@@ -97,7 +117,23 @@ function extractXmlNodes(xml: string, position: number): XmlNodeData {
         };
   }
 
-  if (xml[position + 1] === "!" && xml[position + 2] === "-") {
+  if (xml[position + 1] === "!" && xml[position + 2] === "[") {
+    const end = xml.indexOf("]]>", position + 3);
+    return end === -1
+      ? { raw: xml.slice(position), role: "textLeaf", tag: "", end: xml.length }
+      : {
+          raw: xml.slice(position, end + 3),
+          role: "textLeaf",
+          tag: "",
+          end: end + 3,
+        };
+  }
+
+  if (
+    xml[position + 1] === "!" &&
+    xml[position + 2] === "-" &&
+    xml[position + 3] === "-"
+  ) {
     const end = xml.indexOf("-->", position + 4);
     return end === -1
       ? { raw: xml.slice(position), role: "comment", tag: "", end: xml.length }
@@ -109,7 +145,20 @@ function extractXmlNodes(xml: string, position: number): XmlNodeData {
         };
   }
 
-  const closeAt = xml.indexOf(">", position);
+  if (xml.startsWith("<!DOCTYPE", position)) {
+    const bracketOpen = xml.indexOf("[", position);
+    const firstClose = xml.indexOf(">", position);
+    const hasBracket = bracketOpen !== -1 && bracketOpen < firstClose;
+    if (hasBracket) {
+      const bracketClose = xml.indexOf("]>", bracketOpen);
+      const end = bracketClose === -1 ? xml.length : bracketClose + 2;
+      return { raw: xml.slice(position, end), role: "doctype", tag: "", end };
+    }
+    const end = firstClose === -1 ? xml.length : firstClose + 1;
+    return { raw: xml.slice(position, end), role: "doctype", tag: "", end };
+  }
+
+  const closeAt = findTagClose(xml, position + 1);
   if (closeAt === -1)
     return {
       raw: xml.slice(position),

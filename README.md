@@ -10,12 +10,40 @@ A zero-dependency Node.js package for converting XML to HTML. Currently in pre-1
 
 ---
 
+## v0.1.x: XML Node Extraction & Scaffolding
+
+Version `0.1.x` is focused entirely on parsing raw XML into a structured tree of nodes. The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
+
+```ts
+interface XmlNode {
+  role: XmlNodeRole;
+  raw: string;
+  globalIndex: number;
+  localIndex: number;
+  children?: XmlNode[];
+  malformed?: true;
+}
+
+type XmlNodeRole =
+  | "closeTag"
+  | "comment"
+  | "doctype"
+  | "openTag"
+  | "processingInstruction"
+  | "selfTag"
+  | "textLeaf";
+```
+
+This scaffold is the foundation everything else will be built on. No transformation, no HTML output, no opinions about content, just an accurate, traversable representation of what the XML says.
+
+---
+
 > **Where I am right now**
 >
-> `v0.x` is building the scaffold - a structural tree of every node in your XML document, each carrying its raw source string and its exact position in the document. This scaffold is what the HTML converter will walk when it's built.
+> `v0.x` is building the scaffold: a structural tree of every node in your XML document, each carrying its raw source string and its exact position in the document. This scaffold is what the HTML converter will walk when it's built.
 >
-> - **`scaffold(xml)`** reads any XML string and returns a nested token tree
-> - Every token knows its `role`, its `raw` source string, its `globalIndex` in the document, and its `localIndex` within its parent
+> - **`scaffold(xml)`** reads any XML string and returns a nested node tree
+> - Every node knows its `role`, its `raw` source string, its `globalIndex` in the document, and its `localIndex` within its parent
 > - Broken XML is never thrown - malformed nodes are flagged with `malformed: true` in place and the tree is built regardless
 >
 > `v1.0.0` is when this package becomes what it says it is: a full XML-to-HTML converter. Everything before that is the work to get there.
@@ -45,7 +73,7 @@ const tree = scaffold(`
 `);
 ```
 
-`scaffold` returns a flat array of root-level tokens. Each `openTag` token carries its children nested inside it:
+`scaffold` returns a flat array of root-level nodes. Each `openTag` node carries its children nested inside it:
 
 ```json
 [
@@ -58,25 +86,25 @@ const tree = scaffold(`
   {
     "role": "openTag",
     "raw": "<bookstore>",
-    "globalIndex": 2,
-    "localIndex": 2,
+    "globalIndex": 1,
+    "localIndex": 1,
     "children": [
       {
         "role": "openTag",
         "raw": "<book category=\"cooking\">",
-        "globalIndex": 4,
-        "localIndex": 1,
+        "globalIndex": 2,
+        "localIndex": 0,
         "children": [
           {
             "role": "openTag",
             "raw": "<title lang=\"en\">",
-            "globalIndex": 6,
-            "localIndex": 1,
+            "globalIndex": 3,
+            "localIndex": 0,
             "children": [
               {
                 "role": "textLeaf",
                 "raw": "Everyday Italian",
-                "globalIndex": 7,
+                "globalIndex": 4,
                 "localIndex": 0
               }
             ]
@@ -90,31 +118,32 @@ const tree = scaffold(`
 
 ---
 
-## Token Shape
+## Node Shape
 
-Every token in the tree has the following fields:
+Every node in the tree has the following fields:
 
-| Field         | Type        | Description                                          |
-| ------------- | ----------- | ---------------------------------------------------- |
-| `role`        | `TokenRole` | What kind of token this is                           |
-| `raw`         | `string`    | The exact source string, untouched                   |
-| `globalIndex` | `number`    | Position in the entire document (never resets)       |
-| `localIndex`  | `number`    | Position within the parent's children array          |
-| `children`    | `Token[]`   | Present only on `openTag` - the nested tokens inside |
-| `malformed`   | `true`      | Present only when the structure is broken            |
+| Field         | Type          | Description                                         |
+| ------------- | ------------- | --------------------------------------------------- |
+| `role`        | `XmlNodeRole` | What kind of node this is                           |
+| `raw`         | `string`      | The exact source string, untouched                  |
+| `globalIndex` | `number`      | Position in the entire document (never resets)      |
+| `localIndex`  | `number`      | Position within the parent's children array         |
+| `children`    | `XmlNode[]`   | Present only on `openTag` - the nested nodes inside |
+| `malformed`   | `true`        | Present only when the structure is broken           |
 
 ---
 
-## Token Roles
+## Node Roles
 
-| Role                    | Has children | Description                                  |
-| ----------------------- | ------------ | -------------------------------------------- |
-| `openTag`               | yes          | An opening tag, e.g. `<book category="web">` |
-| `selfTag`               | no           | A self-closing tag, e.g. `<br/>`             |
-| `closeTag`              | no           | Only appears when stray (no matching open)   |
-| `processingInstruction` | no           | e.g. `<?xml version="1.0"?>`                 |
-| `comment`               | no           | e.g. `<!-- a comment -->`                    |
-| `textLeaf`              | no           | Text content between tags                    |
+| Role                    | Has children | Description                                         |
+| ----------------------- | ------------ | --------------------------------------------------- |
+| `openTag`               | yes          | An opening tag, e.g. `<book category="web">`        |
+| `selfTag`               | no           | A self-closing tag, e.g. `<br/>`                    |
+| `closeTag`              | no           | Only appears when stray (no matching open)          |
+| `processingInstruction` | no           | e.g. `<?xml version="1.0"?>`                        |
+| `comment`               | no           | e.g. `<!-- a comment -->`                           |
+| `textLeaf`              | no           | Text content between tags, including CDATA sections |
+| `doctype`               | no           | e.g. `<!DOCTYPE html>` or `<!DOCTYPE root [...]>`   |
 
 ---
 
@@ -168,6 +197,27 @@ const tree = scaffold("<root><unclosed><valid>text</valid></root>");
   }
 ]
 ```
+
+---
+
+## Exports
+
+```ts
+import { scaffold, isMalformed } from "xml-to-html-converter";
+import type {
+  XmlNode,
+  XmlNodeRole,
+  MalformedXmlNode,
+} from "xml-to-html-converter";
+```
+
+| Export             | Kind     | Description                                         |
+| ------------------ | -------- | --------------------------------------------------- |
+| `scaffold`         | function | Parses an XML string and returns a node tree        |
+| `isMalformed`      | function | Type guard, narrows `XmlNode` to `MalformedXmlNode` |
+| `XmlNode`          | type     | The shape of every node in the tree                 |
+| `XmlNodeRole`      | type     | Union of all valid role strings                     |
+| `MalformedXmlNode` | type     | `XmlNode` narrowed to `{ malformed: true }`         |
 
 ---
 
