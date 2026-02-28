@@ -1,79 +1,75 @@
-import { Token } from "./types";
+import { XmlNode, XmlNodeData } from "./types";
 
-function scaffold(xml: string): Token[] {
+function scaffold(xml: string): XmlNode[] {
   const counter = { value: 0 };
-  const { tokens } = collectTokens(xml, 0, null, counter);
-  return tokens;
+  const { xmlNodes } = collectXmlNodes(xml, 0, null, counter);
+  return xmlNodes;
 }
 
-function collectTokens(
+function collectXmlNodes(
   xml: string,
   position: number,
   parentTag: string | null,
   counter: { value: number },
-): { tokens: Token[]; position: number; closed: boolean } {
-  const tokens: Token[] = [];
+): { xmlNodes: XmlNode[]; position: number; closed: boolean } {
+  const xmlNodes: XmlNode[] = [];
 
   while (position < xml.length) {
-    const scanned = scanNext(xml, position);
+    const xmlNodeData = extractXmlNodes(xml, position);
 
-    if (scanned.role === "closeTag") {
-      if (scanned.tag === parentTag)
-        return { tokens, position: scanned.end, closed: true };
+    if (xmlNodeData.role === "closeTag") {
+      if (xmlNodeData.tag === parentTag)
+        return { xmlNodes, position: xmlNodeData.end, closed: true };
 
-      tokens.push({
+      xmlNodes.push({
         role: "closeTag",
-        raw: scanned.raw,
+        raw: xmlNodeData.raw,
         globalIndex: counter.value++,
-        localIndex: tokens.length,
+        localIndex: xmlNodes.length,
         malformed: true,
       });
-      position = scanned.end;
+      position = xmlNodeData.end;
       continue;
     }
 
-    if (scanned.role === "openTag" && !scanned.malformed) {
+    if (xmlNodeData.role === "openTag" && !xmlNodeData.malformed) {
       const globalIndex = counter.value++;
-      const localIndex = tokens.length;
-      const nested = collectTokens(xml, scanned.end, scanned.tag, counter);
-      const token: Token = {
+      const localIndex = xmlNodes.length;
+      const nested = collectXmlNodes(
+        xml,
+        xmlNodeData.end,
+        xmlNodeData.tag,
+        counter,
+      );
+      const xmlNode: XmlNode = {
         role: "openTag",
-        raw: scanned.raw,
+        raw: xmlNodeData.raw,
         globalIndex,
         localIndex,
-        children: nested.tokens,
+        children: nested.xmlNodes,
       };
-      if (!nested.closed) token.malformed = true;
-      tokens.push(token);
+      if (!nested.closed) xmlNode.malformed = true;
+      xmlNodes.push(xmlNode);
       position = nested.position;
       continue;
     }
 
-    const token: Token = {
-      role: scanned.role,
-      raw: scanned.raw,
+    const xmlNode: XmlNode = {
+      role: xmlNodeData.role,
+      raw: xmlNodeData.raw,
       globalIndex: counter.value++,
-      localIndex: tokens.length,
+      localIndex: xmlNodes.length,
     };
-    if (scanned.malformed) token.malformed = true;
-    if (scanned.role === "openTag") token.children = [];
-    tokens.push(token);
-    position = scanned.end;
+    if (xmlNodeData.malformed) xmlNode.malformed = true;
+    if (xmlNodeData.role === "openTag") xmlNode.children = [];
+    xmlNodes.push(xmlNode);
+    position = xmlNodeData.end;
   }
 
-  return { tokens, position, closed: parentTag === null };
+  return { xmlNodes, position, closed: parentTag === null };
 }
 
-function scanNext(
-  xml: string,
-  position: number,
-): {
-  raw: string;
-  role: Token["role"];
-  tag: string;
-  end: number;
-  malformed?: true;
-} {
+function extractXmlNodes(xml: string, position: number): XmlNodeData {
   if (xml[position] !== "<") {
     const end = xml.indexOf("<", position);
     return {
