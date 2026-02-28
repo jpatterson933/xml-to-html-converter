@@ -7,22 +7,76 @@ const TokenType = {
   COMMENT: 'comment',
   CDATA: 'cdata',
   MALFORMED: 'malformed',
-};
+} as const;
+
+type TokenTypeValue = typeof TokenType[keyof typeof TokenType];
+
+export interface ProcessingInstructionToken {
+  type: typeof TokenType.PROCESSING_INSTRUCTION;
+  target: string;
+  attributes: Record<string, string>;
+}
+
+export interface ElementOpenToken {
+  type: typeof TokenType.ELEMENT_OPEN;
+  tag: string;
+  attributes: Record<string, string>;
+}
+
+export interface ElementCloseToken {
+  type: typeof TokenType.ELEMENT_CLOSE;
+  tag: string;
+}
+
+export interface SelfClosingToken {
+  type: typeof TokenType.SELF_CLOSING;
+  tag: string;
+  attributes: Record<string, string>;
+}
+
+export interface TextToken {
+  type: typeof TokenType.TEXT;
+  value: string;
+}
+
+export interface CommentToken {
+  type: typeof TokenType.COMMENT;
+  value: string;
+}
+
+export interface CDataToken {
+  type: typeof TokenType.CDATA;
+  value: string;
+}
+
+export interface MalformedToken {
+  type: typeof TokenType.MALFORMED;
+  raw: string;
+}
+
+export type Token =
+  | ProcessingInstructionToken
+  | ElementOpenToken
+  | ElementCloseToken
+  | SelfClosingToken
+  | TextToken
+  | CommentToken
+  | CDataToken
+  | MalformedToken;
 
 const WHITESPACE = /\s/;
-const ATTRIBUTE_PATTERN = /(\S+?)\s*=\s*["']([^"']*)["']/g;
 
-function parseAttributes(raw) {
-  const attributes = {};
-  ATTRIBUTE_PATTERN.lastIndex = 0;
+function parseAttributes(raw: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  const pattern = /(\S+?)\s*=\s*["']([^"']*)["']/g;
   let match;
-  while ((match = ATTRIBUTE_PATTERN.exec(raw)) !== null) {
+  while ((match = pattern.exec(raw)) !== null) {
     attributes[match[1]] = match[2];
   }
   return attributes;
 }
 
-function nextToken(xml, position) {
+function nextToken(xml: string, position: number): { token: Token | null; end: number } {
   if (xml[position] !== '<') {
     const end = xml.indexOf('<', position);
     const value = xml.slice(position, end === -1 ? xml.length : end);
@@ -69,8 +123,8 @@ function nextToken(xml, position) {
   return { token: { type, tag, attributes: parseAttributes(inner) }, end };
 }
 
-function tokenize(xml) {
-  const tokens = [];
+function tokenize(xml: string): Token[] {
+  const tokens: Token[] = [];
   let position = 0;
 
   while (position < xml.length) {
@@ -82,4 +136,4 @@ function tokenize(xml) {
   return tokens;
 }
 
-export { tokenize, TokenType };
+export { tokenize, TokenType, type TokenTypeValue };

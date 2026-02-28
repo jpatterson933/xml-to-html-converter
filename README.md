@@ -1,6 +1,6 @@
 # xml-to-html-converter
 
-![version](https://img.shields.io/badge/version-0.1.1-blue)
+![version](https://img.shields.io/npm/v/xml-to-html-converter)
 ![node version](https://img.shields.io/node/v/xml-to-html-converter)
 ![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![XML](https://img.shields.io/badge/input-XML-orange)
@@ -158,4 +158,4 @@ Node.js `>=18.0.0`
 
 ---
 
-![license](https://img.shields.io/badge/license-ISC-green)
+![license](https://img.shields.io/npm/l/xml-to-html-converter)

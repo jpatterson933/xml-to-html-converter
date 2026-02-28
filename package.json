@@ -3,19 +3,24 @@
   "version": "0.1.2",
   "description": "Zero dependency XML to HTML converter for Node environments",
   "type": "module",
-  "main": "src/index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "files": [
-    "src/"
+    "dist/"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "test": "node --test tests/tokenizer.test.js tests/parser.test.js",
-    "coverage": "node --experimental-test-coverage --test tests/tokenizer.test.js tests/parser.test.js"
+    "build": "tsup",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "keywords": [
     "xml",
@@ -24,8 +29,8 @@
     "parser",
     "tree"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Jeffery W. Patterson",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jpatterson933/xml-to-html-converter.git"
@@ -33,5 +38,12 @@
   "bugs": {
     "url": "https://github.com/jpatterson933/xml-to-html-converter/issues"
   },
-  "homepage": "https://github.com/jpatterson933/xml-to-html-converter#readme"
+  "homepage": "https://github.com/jpatterson933/xml-to-html-converter#readme",
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "@vitest/coverage-v8": "^4.0.18",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
 }
