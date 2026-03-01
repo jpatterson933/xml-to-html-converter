@@ -12,7 +12,7 @@ A zero-dependency Node.js package for converting XML to HTML. Currently in pre-1
 
 ## v0.x.x: XML Node Extraction & Scaffolding
 
-Version `0.1.x` is focused entirely on parsing raw XML into a structured tree of nodes. The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
+Version `0.2.x` is focused entirely on parsing raw XML into a structured tree of nodes. The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
 
 ```ts
 interface XmlAttribute {
