@@ -48,12 +48,13 @@ This scaffold is the foundation everything else will be built on. No transformat
 
 > **Where I am right now**
 >
-> `v0.x` is building the scaffold: a structural tree of every node in your XML document, each carrying its raw source string and its exact position in the document. This scaffold is what the HTML converter will walk when it's built.
+> `v0.x` is building the scaffold and the first render pass.
 >
 > - **`scaffold(xml)`** reads any XML string and returns a nested node tree
 > - Every node knows its `role`, its `raw` source string, its `globalIndex` in the document, and its `localIndex` within its parent
 > - Tag nodes (`openTag`, `selfTag`) also carry `xmlTag`, `xmlInner`, and `xmlAttributes` — the parsed tag name, raw attribute string, and structured attribute array
-> - Broken XML is never thrown - malformed nodes are flagged with `malformed: true` in place and the tree is built regardless
+> - Broken XML is never thrown — malformed nodes are flagged with `malformed: true` in place and the tree is built regardless
+> - **`render(nodes)`** takes the scaffold output and converts it to an HTML string — every XML element becomes a `<div>` with `data-tag` and `data-attrs-*` attributes
 >
 > `v1.0.0` is when this package becomes what it says it is: a full XML-to-HTML converter. Everything before that is the work to get there.
 
@@ -68,6 +69,8 @@ npm install xml-to-html-converter
 ---
 
 ## Usage
+
+### Parsing XML into a node tree
 
 ```js
 import { scaffold } from "xml-to-html-converter";
@@ -130,6 +133,34 @@ const tree = scaffold(`
   }
 ]
 ```
+
+### Converting the tree to HTML
+
+```js
+import { scaffold, render } from "xml-to-html-converter";
+
+const html = render(
+  scaffold(`
+  <bookstore>
+    <book category="cooking">
+      <title lang="en">Everyday Italian</title>
+    </book>
+  </bookstore>
+`),
+);
+```
+
+`render` walks the node tree and converts every XML element to a `<div>`. The original tag name is preserved in `data-tag` and each attribute becomes its own `data-attrs-*` attribute:
+
+```html
+<div data-tag="bookstore">
+  <div data-tag="book" data-attrs-category="cooking">
+    <div data-tag="title" data-attrs-lang="en">Everyday Italian</div>
+  </div>
+</div>
+```
+
+Processing instructions and doctypes are dropped. Comments are passed through unchanged.
 
 ---
 
@@ -222,7 +253,7 @@ const tree = scaffold("<root><unclosed><valid>text</valid></root>");
 ## Exports
 
 ```ts
-import { scaffold, isMalformed } from "xml-to-html-converter";
+import { scaffold, render, isMalformed } from "xml-to-html-converter";
 import type {
   XmlNode,
   XmlNodeRole,
@@ -234,6 +265,7 @@ import type {
 | Export             | Kind     | Description                                         |
 | ------------------ | -------- | --------------------------------------------------- |
 | `scaffold`         | function | Parses an XML string and returns a node tree        |
+| `render`           | function | Converts a node tree to an HTML string              |
 | `isMalformed`      | function | Type guard, narrows `XmlNode` to `MalformedXmlNode` |
 | `XmlNode`          | type     | The shape of every node in the tree                 |
 | `XmlNodeRole`      | type     | Union of all valid role strings                     |

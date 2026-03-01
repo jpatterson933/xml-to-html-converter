@@ -1,3 +1,4 @@
+export { render } from "./modules/render/render";
 export { scaffold } from "./modules/scaffold/scaffold";
 export { isMalformed } from "./modules/scaffold/types";
 export type {
