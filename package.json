@@ -1,6 +1,6 @@
 {
   "name": "xml-to-html-converter",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Zero dependency XML to HTML converter for Node environments",
   "type": "module",
   "main": "./dist/index.js",
