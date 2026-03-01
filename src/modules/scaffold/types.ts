@@ -21,11 +21,3 @@ export type MalformedXmlNode = XmlNode & { malformed: true };
 export function isMalformed(node: XmlNode): node is MalformedXmlNode {
   return node.malformed === true;
 }
-
-export interface XmlNodeData {
-  raw: string;
-  role: XmlNode["role"];
-  tag: string;
-  end: number;
-  malformed?: true;
-}

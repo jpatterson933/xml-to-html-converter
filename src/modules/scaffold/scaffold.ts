@@ -1,4 +1,18 @@
-import { XmlNode, XmlNodeData } from "./types";
+import { XmlNode } from "./types";
+
+interface XmlNodeData {
+  raw: string;
+  role: XmlNode["role"];
+  tag: string;
+  end: number;
+  malformed?: true;
+}
+
+interface CollectResult {
+  xmlNodes: XmlNode[];
+  position: number;
+  closed: boolean;
+}
 
 function scaffold(xml: string): XmlNode[] {
   const counter = { value: 0 };
@@ -11,7 +25,7 @@ function collectXmlNodes(
   position: number,
   parentTag: string | null,
   counter: { value: number },
-): { xmlNodes: XmlNode[]; position: number; closed: boolean } {
+): CollectResult {
   const xmlNodes: XmlNode[] = [];
 
   while (position < xml.length) {

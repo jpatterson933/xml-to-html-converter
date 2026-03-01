@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scaffold } from "../src/modules/scaffold/scaffold";
+import { scaffold } from "../src/index";
 // -----------------------------------------------------------------------------
 // Node shape reference:
 //
