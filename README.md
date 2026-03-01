@@ -15,9 +15,17 @@ A zero-dependency Node.js package for converting XML to HTML. Currently in pre-1
 Version `0.1.x` is focused entirely on parsing raw XML into a structured tree of nodes. The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
 
 ```ts
+interface XmlAttribute {
+  name: string;
+  value: string;
+}
+
 interface XmlNode {
   role: XmlNodeRole;
   raw: string;
+  xmlTag?: string;
+  xmlInner?: string;
+  xmlAttributes?: XmlAttribute[];
   globalIndex: number;
   localIndex: number;
   children?: XmlNode[];
@@ -44,6 +52,7 @@ This scaffold is the foundation everything else will be built on. No transformat
 >
 > - **`scaffold(xml)`** reads any XML string and returns a nested node tree
 > - Every node knows its `role`, its `raw` source string, its `globalIndex` in the document, and its `localIndex` within its parent
+> - Tag nodes (`openTag`, `selfTag`) also carry `xmlTag`, `xmlInner`, and `xmlAttributes` — the parsed tag name, raw attribute string, and structured attribute array
 > - Broken XML is never thrown - malformed nodes are flagged with `malformed: true` in place and the tree is built regardless
 >
 > `v1.0.0` is when this package becomes what it says it is: a full XML-to-HTML converter. Everything before that is the work to get there.
@@ -92,12 +101,18 @@ const tree = scaffold(`
       {
         "role": "openTag",
         "raw": "<book category=\"cooking\">",
+        "xmlTag": "book",
+        "xmlInner": "category=\"cooking\"",
+        "xmlAttributes": [{ "name": "category", "value": "cooking" }],
         "globalIndex": 2,
         "localIndex": 0,
         "children": [
           {
             "role": "openTag",
             "raw": "<title lang=\"en\">",
+            "xmlTag": "title",
+            "xmlInner": "lang=\"en\"",
+            "xmlAttributes": [{ "name": "lang", "value": "en" }],
             "globalIndex": 3,
             "localIndex": 0,
             "children": [
@@ -122,14 +137,17 @@ const tree = scaffold(`
 
 Every node in the tree has the following fields:
 
-| Field         | Type          | Description                                         |
-| ------------- | ------------- | --------------------------------------------------- |
-| `role`        | `XmlNodeRole` | What kind of node this is                           |
-| `raw`         | `string`      | The exact source string, untouched                  |
-| `globalIndex` | `number`      | Position in the entire document (never resets)      |
-| `localIndex`  | `number`      | Position within the parent's children array         |
-| `children`    | `XmlNode[]`   | Present only on `openTag` - the nested nodes inside |
-| `malformed`   | `true`        | Present only when the structure is broken           |
+| Field           | Type             | Description                                                                                                           |
+| --------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `role`          | `XmlNodeRole`    | What kind of node this is                                                                                             |
+| `raw`           | `string`         | The exact source string, untouched                                                                                    |
+| `xmlTag`        | `string`         | Tag name only, e.g. `"book"` or `"env:Envelope"`. Present on `openTag`, `selfTag`, `closeTag`                         |
+| `xmlInner`      | `string`         | Everything after the tag name inside the brackets, verbatim. Present on `openTag` and `selfTag` when attributes exist |
+| `xmlAttributes` | `XmlAttribute[]` | Parsed array of `{ name, value }` attribute objects. Present on `openTag` and `selfTag` when attributes exist         |
+| `globalIndex`   | `number`         | Position in the entire document (never resets)                                                                        |
+| `localIndex`    | `number`         | Position within the parent's children array                                                                           |
+| `children`      | `XmlNode[]`      | Present only on `openTag` - the nested nodes inside                                                                   |
+| `malformed`     | `true`           | Present only when the structure is broken                                                                             |
 
 ---
 
@@ -151,11 +169,12 @@ Every node in the tree has the following fields:
 
 `scaffold` never throws. No matter what the input looks like, it always returns a complete tree. Malformed structures are flagged with `malformed: true` in place and the walk continues.
 
-Three cases are handled:
+Four cases are handled:
 
 - **Unclosed tags** - opens but never closes, gets `malformed: true`, children are still collected
 - **Stray closing tags** - a `</tag>` with no matching open surfaces as a `closeTag` token with `malformed: true`
 - **Unclosed brackets** - a `<` with no matching `>` captures the remainder as a malformed token
+- **Excessive nesting** - documents nested beyond 500 levels have the deepest open tag flagged `malformed: true` to prevent a stack overflow
 
 ```js
 const tree = scaffold("<root><unclosed><valid>text</valid></root>");
@@ -207,6 +226,7 @@ import { scaffold, isMalformed } from "xml-to-html-converter";
 import type {
   XmlNode,
   XmlNodeRole,
+  XmlAttribute,
   MalformedXmlNode,
 } from "xml-to-html-converter";
 ```
@@ -217,6 +237,7 @@ import type {
 | `isMalformed`      | function | Type guard, narrows `XmlNode` to `MalformedXmlNode` |
 | `XmlNode`          | type     | The shape of every node in the tree                 |
 | `XmlNodeRole`      | type     | Union of all valid role strings                     |
+| `XmlAttribute`     | type     | Shape of a parsed attribute `{ name, value }`       |
 | `MalformedXmlNode` | type     | `XmlNode` narrowed to `{ malformed: true }`         |
 
 ---

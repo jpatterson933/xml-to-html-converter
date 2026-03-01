@@ -1,5 +1,6 @@
+import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
-import { scaffold } from "../src/index";
+import { isMalformed, scaffold } from "../src/index";
 // -----------------------------------------------------------------------------
 // Node shape reference:
 //
@@ -380,5 +381,363 @@ describe("edge cases", () => {
     expect(d?.globalIndex).toBe(3);
     expect(d?.role).toBe("selfTag");
     expect(d?.localIndex).toBe(0);
+  });
+
+  it("returns all root-level siblings from a multi-root document with correct indexes", () => {
+    const tokens = scaffold("<a/><b/><c/>");
+    expect(tokens.length).toBe(3);
+    expect(tokens[0].role).toBe("selfTag");
+    expect(tokens[0].raw).toBe("<a/>");
+    expect(tokens[0].globalIndex).toBe(0);
+    expect(tokens[0].localIndex).toBe(0);
+    expect(tokens[1].role).toBe("selfTag");
+    expect(tokens[1].raw).toBe("<b/>");
+    expect(tokens[1].globalIndex).toBe(1);
+    expect(tokens[1].localIndex).toBe(1);
+    expect(tokens[2].role).toBe("selfTag");
+    expect(tokens[2].raw).toBe("<c/>");
+    expect(tokens[2].globalIndex).toBe(2);
+    expect(tokens[2].localIndex).toBe(2);
+  });
+
+  it("produces a malformed openTag node with empty tag and raw '<' for a bare less-than", () => {
+    const tokens = scaffold("<");
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].role).toBe("openTag");
+    expect(tokens[0].raw).toBe("<");
+    expect(tokens[0].malformed).toBe(true);
+    expect(tokens[0].raw).toBe("<");
+  });
+
+  it("produces a malformed closeTag node with empty tag for '</>'", () => {
+    const tokens = scaffold("</>");
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].role).toBe("closeTag");
+    expect(tokens[0].raw).toBe("</>");
+    expect(tokens[0].malformed).toBe(true);
+  });
+});
+
+describe("unclosed constructs", () => {
+  it("returns a processingInstruction node with full raw content when '?>' is never closed", () => {
+    const tokens = scaffold("<?xml version='1.0'");
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].role).toBe("processingInstruction");
+    expect(tokens[0].raw).toBe("<?xml version='1.0'");
+    expect(tokens[0].malformed).toBeUndefined();
+  });
+
+  it("returns a comment node with full raw content when '-->' is never closed", () => {
+    const tokens = scaffold("<!-- this comment never ends");
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].role).toBe("comment");
+    expect(tokens[0].raw).toBe("<!-- this comment never ends");
+    expect(tokens[0].malformed).toBeUndefined();
+  });
+
+  it("returns a textLeaf node with full raw CDATA content when ']]>' is never closed", () => {
+    const tokens = scaffold("<![CDATA[data without close");
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].role).toBe("textLeaf");
+    expect(tokens[0].raw).toBe("<![CDATA[data without close");
+    expect(tokens[0].malformed).toBeUndefined();
+  });
+});
+
+describe("isMalformed type guard", () => {
+  it("returns false for a well-formed node", () => {
+    const tokens = scaffold("<br/>");
+    expect(isMalformed(tokens[0])).toBe(false);
+  });
+
+  it("returns true for a node flagged as malformed", () => {
+    const tokens = scaffold("<unclosed");
+    expect(isMalformed(tokens[0])).toBe(true);
+  });
+});
+
+describe("max depth protection", () => {
+  it("does not throw and marks the deepest open tag as malformed when nesting exceeds 500 levels", () => {
+    const open = "<a>".repeat(501);
+    const close = "</a>".repeat(501);
+    const xml = open + close;
+    expect(() => scaffold(xml)).not.toThrow();
+    const collectAll = (
+      nodes: ReturnType<typeof scaffold>,
+    ): ReturnType<typeof scaffold> =>
+      nodes.flatMap((n) => [n, ...collectAll(n.children ?? [])]);
+    const all = collectAll(scaffold(xml));
+    const malformedNodes = all.filter((n) => n.malformed === true);
+    expect(malformedNodes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("xmlTag field", () => {
+  it("populates xmlTag with the tag name on an openTag node", () => {
+    const tokens = scaffold("<book></book>");
+    expect(tokens[0].xmlTag).toBe("book");
+  });
+
+  it("populates xmlTag with the tag name on a selfTag node", () => {
+    const tokens = scaffold("<br/>");
+    expect(tokens[0].xmlTag).toBe("br");
+  });
+
+  it("populates xmlTag with the tag name on a stray malformed closeTag node", () => {
+    const tokens = scaffold("<a/></orphan>");
+    const stray = tokens[1];
+    expect(stray.role).toBe("closeTag");
+    expect(stray.xmlTag).toBe("orphan");
+  });
+
+  it("does not populate xmlTag on a textLeaf node", () => {
+    const tokens = scaffold("<p>hello</p>");
+    const text = tokens[0].children?.[0];
+    expect(text?.role).toBe("textLeaf");
+    expect(text?.xmlTag).toBeUndefined();
+  });
+
+  it("does not populate xmlTag on a comment node", () => {
+    const tokens = scaffold("<!-- comment -->");
+    expect(tokens[0].xmlTag).toBeUndefined();
+  });
+
+  it("does not populate xmlTag on a processingInstruction node", () => {
+    const tokens = scaffold('<?xml version="1.0"?>');
+    expect(tokens[0].xmlTag).toBeUndefined();
+  });
+
+  it("does not populate xmlTag on a doctype node", () => {
+    const tokens = scaffold("<!DOCTYPE html><root/>");
+    expect(tokens[0].xmlTag).toBeUndefined();
+  });
+
+  it("preserves namespace prefixes verbatim in xmlTag", () => {
+    const tokens = scaffold("<env:Envelope></env:Envelope>");
+    expect(tokens[0].xmlTag).toBe("env:Envelope");
+  });
+
+  it("populates xmlTag correctly on a deeply nested child node", () => {
+    const tokens = scaffold("<a><b><c/></b></a>");
+    const c = tokens[0].children?.[0].children?.[0];
+    expect(c?.xmlTag).toBe("c");
+  });
+
+  it("populates xmlTag on an openTag that has attributes", () => {
+    const tokens = scaffold('<book category="cooking"></book>');
+    expect(tokens[0].xmlTag).toBe("book");
+  });
+});
+
+describe("xmlInner field", () => {
+  it("populates xmlInner with everything after the tag name on an openTag with attributes", () => {
+    const tokens = scaffold('<book category="cooking"></book>');
+    expect(tokens[0].xmlInner).toBe('category="cooking"');
+  });
+
+  it("does not populate xmlInner on an openTag with no attributes", () => {
+    const tokens = scaffold("<book></book>");
+    expect(tokens[0].xmlInner).toBeUndefined();
+  });
+
+  it("populates xmlInner on a selfTag with attributes", () => {
+    const tokens = scaffold('<img src="photo.jpg" alt="photo"/>');
+    expect(tokens[0].xmlInner).toBe('src="photo.jpg" alt="photo"');
+  });
+
+  it("does not populate xmlInner on a selfTag with no attributes", () => {
+    const tokens = scaffold("<br/>");
+    expect(tokens[0].xmlInner).toBeUndefined();
+  });
+
+  it("does not populate xmlInner on a textLeaf node", () => {
+    const tokens = scaffold("<p>hello</p>");
+    const text = tokens[0].children?.[0];
+    expect(text?.xmlInner).toBeUndefined();
+  });
+
+  it("does not populate xmlInner on a comment node", () => {
+    const tokens = scaffold("<!-- comment -->");
+    expect(tokens[0].xmlInner).toBeUndefined();
+  });
+
+  it("does not populate xmlInner on a processingInstruction node", () => {
+    const tokens = scaffold('<?xml version="1.0"?>');
+    expect(tokens[0].xmlInner).toBeUndefined();
+  });
+
+  it("does not populate xmlInner on a doctype node", () => {
+    const tokens = scaffold("<!DOCTYPE html><root/>");
+    expect(tokens[0].xmlInner).toBeUndefined();
+  });
+
+  it("preserves multi-line and tab-separated attributes verbatim in xmlInner", () => {
+    const xml = readFileSync(
+      new URL("./fixtures/SOAP.xml", import.meta.url),
+      "utf-8",
+    );
+    const tokens = scaffold(xml);
+    const header = tokens[1].children?.[0];
+    const reservation = header?.children?.[0];
+    expect(reservation?.xmlInner).toBe(
+      'xmlns:m="http://travelcompany.example.org/reservation"\n\t\tenv:role="http://www.w3.org/2003/05/soap-envelope/role/next"',
+    );
+  });
+
+  it("populates xmlInner on a deeply nested child node with attributes", () => {
+    const tokens = scaffold('<a><b lang="en"></b></a>');
+    const b = tokens[0].children?.[0];
+    expect(b?.xmlInner).toBe('lang="en"');
+  });
+});
+
+describe("xmlAttributes field", () => {
+  it("parses a single double-quoted attribute into an array with one entry", () => {
+    const tokens = scaffold('<book category="cooking"></book>');
+    expect(tokens[0].xmlAttributes).toEqual([
+      { name: "category", value: "cooking" },
+    ]);
+  });
+
+  it("parses multiple attributes into an array preserving order", () => {
+    const tokens = scaffold('<title lang="en" dir="ltr"></title>');
+    expect(tokens[0].xmlAttributes).toEqual([
+      { name: "lang", value: "en" },
+      { name: "dir", value: "ltr" },
+    ]);
+  });
+
+  it("parses a single-quoted attribute value correctly", () => {
+    const tokens = scaffold("<root type='basic'></root>");
+    expect(tokens[0].xmlAttributes).toEqual([{ name: "type", value: "basic" }]);
+  });
+
+  it("parses namespace-prefixed attribute names verbatim", () => {
+    const tokens = scaffold(
+      '<el xmlns:m="http://example.com" env:role="next"></el>',
+    );
+    expect(tokens[0].xmlAttributes).toEqual([
+      { name: "xmlns:m", value: "http://example.com" },
+      { name: "env:role", value: "next" },
+    ]);
+  });
+
+  it("parses multi-line tab-separated attributes from the SOAP fixture", () => {
+    const xml = readFileSync(
+      new URL("./fixtures/SOAP.xml", import.meta.url),
+      "utf-8",
+    );
+    const tokens = scaffold(xml);
+    const header = tokens[1].children?.[0];
+    const reservation = header?.children?.[0];
+    expect(reservation?.xmlAttributes).toEqual([
+      {
+        name: "xmlns:m",
+        value: "http://travelcompany.example.org/reservation",
+      },
+      {
+        name: "env:role",
+        value: "http://www.w3.org/2003/05/soap-envelope/role/next",
+      },
+    ]);
+  });
+
+  it("parses attributes on a selfTag", () => {
+    const tokens = scaffold('<img src="photo.jpg" alt="photo"/>');
+    expect(tokens[0].xmlAttributes).toEqual([
+      { name: "src", value: "photo.jpg" },
+      { name: "alt", value: "photo" },
+    ]);
+  });
+
+  it("does not populate xmlAttributes on an openTag with no attributes", () => {
+    const tokens = scaffold("<book></book>");
+    expect(tokens[0].xmlAttributes).toBeUndefined();
+  });
+
+  it("does not populate xmlAttributes on a selfTag with no attributes", () => {
+    const tokens = scaffold("<br/>");
+    expect(tokens[0].xmlAttributes).toBeUndefined();
+  });
+
+  it("does not populate xmlAttributes on a textLeaf node", () => {
+    const tokens = scaffold("<p>hello</p>");
+    expect(tokens[0].children?.[0].xmlAttributes).toBeUndefined();
+  });
+
+  it("does not populate xmlAttributes on a comment node", () => {
+    const tokens = scaffold("<!-- comment -->");
+    expect(tokens[0].xmlAttributes).toBeUndefined();
+  });
+
+  it("does not populate xmlAttributes on a processingInstruction node", () => {
+    const tokens = scaffold('<?xml version="1.0"?>');
+    expect(tokens[0].xmlAttributes).toBeUndefined();
+  });
+
+  it("does not populate xmlAttributes on a doctype node", () => {
+    const tokens = scaffold("<!DOCTYPE html><root/>");
+    expect(tokens[0].xmlAttributes).toBeUndefined();
+  });
+});
+
+describe("SOAP envelope", () => {
+  const xml = readFileSync(
+    new URL("./fixtures/SOAP.xml", import.meta.url),
+    "utf-8",
+  );
+  const tokens = scaffold(xml);
+
+  it("parses the SOAP envelope as a single root openTag with a namespace-prefixed tag name", () => {
+    expect(tokens.length).toBe(2);
+    expect(tokens[0].role).toBe("processingInstruction");
+    expect(tokens[1].role).toBe("openTag");
+    expect(tokens[1].raw).toContain("env:Envelope");
+    expect(tokens[1].malformed).toBeUndefined();
+  });
+
+  it("preserves the full xmlns attribute in the raw envelope opening tag", () => {
+    const envelope = tokens[1];
+    expect(envelope.raw).toContain(
+      'xmlns:env="http://www.w3.org/2003/05/soap-envelope"',
+    );
+  });
+
+  it("produces env:Header and env:Body as the two children of env:Envelope", () => {
+    const envelope = tokens[1];
+    expect(envelope.children?.length).toBe(2);
+    expect(envelope.children?.[0].role).toBe("openTag");
+    expect(envelope.children?.[0].raw).toContain("env:Header");
+    expect(envelope.children?.[1].role).toBe("openTag");
+    expect(envelope.children?.[1].raw).toContain("env:Body");
+  });
+
+  it("preserves namespace-prefixed tag names verbatim without stripping the prefix", () => {
+    const header = tokens[1].children?.[0];
+    const reservation = header?.children?.[0];
+    expect(reservation?.raw).toContain("m:reservation");
+    const passenger = header?.children?.[1];
+    expect(passenger?.raw).toContain("n:passenger");
+  });
+
+  it("correctly parses deeply nested text content inside env:Body", () => {
+    const body = tokens[1].children?.[1];
+    const itinerary = body?.children?.[0];
+    const departure = itinerary?.children?.[0];
+    const departing = departure?.children?.[0];
+    expect(departing?.raw).toContain("p:departing");
+    const text = departing?.children?.[0];
+    expect(text?.role).toBe("textLeaf");
+    expect(text?.raw).toBe("New York");
+  });
+
+  it("surfaces no malformed nodes anywhere in the SOAP tree", () => {
+    const collectAll = (
+      nodes: ReturnType<typeof scaffold>,
+    ): ReturnType<typeof scaffold> =>
+      nodes.flatMap((n) => [n, ...collectAll(n.children ?? [])]);
+    const all = collectAll(tokens);
+    const malformedNodes = all.filter((n) => n.malformed === true);
+    expect(malformedNodes.length).toBe(0);
   });
 });

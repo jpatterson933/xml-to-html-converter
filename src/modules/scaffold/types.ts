@@ -1,3 +1,8 @@
+export interface XmlAttribute {
+  name: string;
+  value: string;
+}
+
 export type XmlNodeRole =
   | "closeTag"
   | "comment"
@@ -10,6 +15,9 @@ export type XmlNodeRole =
 export interface XmlNode {
   role: XmlNodeRole;
   raw: string;
+  xmlTag?: string;
+  xmlInner?: string;
+  xmlAttributes?: XmlAttribute[];
   globalIndex: number;
   localIndex: number;
   children?: XmlNode[];
