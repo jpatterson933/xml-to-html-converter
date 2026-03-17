@@ -8,3 +8,4 @@ export type {
   XmlNode,
   XmlNodeRole,
 } from "./modules/scaffold/types";
+export { walk } from "./modules/walk/walk";

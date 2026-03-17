@@ -6,58 +6,12 @@
 ![XML](https://img.shields.io/badge/input-XML-orange)
 ![HTML](https://img.shields.io/badge/output-HTML-red)
 
-A zero-dependency Node.js package for converting XML to HTML. Currently in pre-1.0.0 development, building the foundation one functional part at a time. Full XML-to-HTML conversion is the goal of `v1.0.0`.
+A zero-dependency Node.js package for converting XML to HTML.
 
----
-
-## XML Node Extraction & Scaffolding
-
-The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
-
-```ts
-interface XmlAttribute {
-  name: string;
-  value: string;
-}
-
-interface XmlNode {
-  role: XmlNodeRole;
-  raw: string;
-  xmlTag?: string;
-  xmlInner?: string;
-  xmlAttributes?: XmlAttribute[];
-  globalIndex: number;
-  localIndex: number;
-  children?: XmlNode[];
-  malformed?: true;
-}
-
-type XmlNodeRole =
-  | "closeTag"
-  | "comment"
-  | "doctype"
-  | "openTag"
-  | "processingInstruction"
-  | "selfTag"
-  | "textLeaf";
-```
-
-This scaffold is the foundation everything else will be built on. No transformation, no HTML output, no opinions about content, just an accurate, traversable representation of what the XML says.
-
----
-
-> **Where I am right now**
->
-> `v0.x` is building the scaffold and the first render pass.
->
-> - **`minify(xml)`** strips inter-tag whitespace from prettified XML before parsing — text content is left untouched
-> - **`scaffold(xml)`** reads any XML string and returns a nested node tree
-> - Every node knows its `role`, its `raw` source string, its `globalIndex` in the document, and its `localIndex` within its parent
-> - Tag nodes (`openTag`, `selfTag`) also carry `xmlTag`, `xmlInner`, and `xmlAttributes` — the parsed tag name, raw attribute string, and structured attribute array
-> - Broken XML is never thrown — malformed nodes are flagged with `malformed: true` in place and the tree is built regardless
-> - **`render(nodes)`** takes the scaffold output and converts it to an HTML string — every XML element becomes a `<div>` with `data-tag` and `data-attrs-*` attributes
->
-> `v1.0.0` is when this package becomes what it says it is: a full XML-to-HTML converter. Everything before that is the work to get there.
+- **`minify(xml)`** strips inter-tag whitespace from prettified XML before parsing. Text content is left untouched
+- **`scaffold(xml)`** reads any XML string and returns a nested node tree
+- **`walk(nodes, visitor)`** traverses the full node tree depth-first, visiting every node
+- **`render(nodes)`** converts a node tree to an HTML string. Every XML element becomes a `<div>` with `data-tag` and `data-attrs-*` attributes
 
 ---
 
@@ -71,7 +25,30 @@ npm install xml-to-html-converter
 
 ## Usage
 
-### Parsing XML into a node tree
+### minify
+
+When your XML comes from a file or an API it is usually indented and line-broken. `minify` strips the whitespace between tags before parsing. Text content is left completely untouched.
+
+```js
+import { minify } from "xml-to-html-converter";
+
+const clean = minify(`
+  <bookstore>
+    <book category="cooking">
+      <title lang="en">Everyday Italian</title>
+    </book>
+  </bookstore>
+`);
+// <bookstore><book category="cooking"><title lang="en">Everyday Italian</title></book></bookstore>
+```
+
+`minify` is opt-in. Skip it if whitespace inside your content is meaningful.
+
+---
+
+### scaffold
+
+`scaffold` parses an XML string into a structured tree of `XmlNode` objects. Each node carries its role, its raw source text, and its position in the document both globally across the full document and locally within its parent.
 
 ```js
 import { scaffold } from "xml-to-html-converter";
@@ -135,7 +112,43 @@ const tree = scaffold(`
 ]
 ```
 
-### Converting the tree to HTML
+`scaffold` never throws. Malformed structures are flagged with `malformed: true` in place and the tree is built regardless. See [Malformed XML](#malformed-xml) for details.
+
+---
+
+### walk
+
+`walk` traverses the full node tree depth-first, calling a visitor function on every node including all descendants. The visitor decides what to collect or do. `walk` has no opinions.
+
+```js
+import { scaffold, walk } from "xml-to-html-converter";
+
+const tree = scaffold(xml);
+
+// collect all text content
+const text = [];
+walk(tree, (node) => {
+  if (node.role === "textLeaf") text.push(node.raw);
+});
+
+// find all nodes with a specific tag
+const titles = [];
+walk(tree, (node) => {
+  if (node.xmlTag === "title") titles.push(node);
+});
+
+// check for malformed nodes anywhere in the tree
+const broken = [];
+walk(tree, (node) => {
+  if (node.malformed) broken.push(node);
+});
+```
+
+---
+
+### render
+
+`render` walks the node tree and converts every XML element to a `<div>`. The original tag name is preserved in `data-tag` and each attribute becomes its own `data-attrs-*` attribute.
 
 ```js
 import { scaffold, render } from "xml-to-html-converter";
@@ -151,8 +164,6 @@ const html = render(
 );
 ```
 
-`render` walks the node tree and converts every XML element to a `<div>`. The original tag name is preserved in `data-tag` and each attribute becomes its own `data-attrs-*` attribute:
-
 ```html
 <div data-tag="bookstore">
   <div data-tag="book" data-attrs-category="cooking">
@@ -165,17 +176,19 @@ Processing instructions and doctypes are dropped. Comments are passed through un
 
 ---
 
-### Minifying prettified XML
-
-When your XML comes from a file or an API it is usually indented and line-broken. `minify` strips the whitespace between tags before parsing, leaving text content completely untouched.
+### Full pipeline
 
 ```js
-import { minify, scaffold, render } from "xml-to-html-converter";
+import { minify, scaffold, walk, render } from "xml-to-html-converter";
 
-const html = render(scaffold(minify(xml)));
+const tree = scaffold(minify(xml));
+
+walk(tree, (node) => {
+  if (node.malformed) console.warn("malformed node", node.raw);
+});
+
+const html = render(tree);
 ```
-
-`minify` is opt-in. Skip it if whitespace inside your content is meaningful.
 
 ---
 
@@ -187,7 +200,7 @@ Every node in the tree has the following fields:
 | --------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `role`          | `XmlNodeRole`    | What kind of node this is                                                                                             |
 | `raw`           | `string`         | The exact source string, untouched                                                                                    |
-| `xmlTag`        | `string`         | Tag name only, e.g. `"book"` or `"env:Envelope"`. Present on `openTag`, `selfTag`, `closeTag`                         |
+| `xmlTag`        | `string`         | Tag name only, e.g. `"book"` or `"env:Envelope"`. Present on `openTag`, `selfTag`, and `closeTag`                     |
 | `xmlInner`      | `string`         | Everything after the tag name inside the brackets, verbatim. Present on `openTag` and `selfTag` when attributes exist |
 | `xmlAttributes` | `XmlAttribute[]` | Parsed array of `{ name, value }` attribute objects. Present on `openTag` and `selfTag` when attributes exist         |
 | `globalIndex`   | `number`         | Position in the entire document (never resets)                                                                        |
@@ -268,7 +281,13 @@ const tree = scaffold("<root><unclosed><valid>text</valid></root>");
 ## Exports
 
 ```ts
-import { scaffold, render, minify, isMalformed } from "xml-to-html-converter";
+import {
+  minify,
+  scaffold,
+  walk,
+  render,
+  isMalformed,
+} from "xml-to-html-converter";
 import type {
   XmlNode,
   XmlNodeRole,
@@ -277,16 +296,17 @@ import type {
 } from "xml-to-html-converter";
 ```
 
-| Export             | Kind     | Description                                         |
-| ------------------ | -------- | --------------------------------------------------- |
-| `minify`           | function | Strips inter-tag whitespace from an XML string      |
-| `scaffold`         | function | Parses an XML string and returns a node tree        |
-| `render`           | function | Converts a node tree to an HTML string              |
-| `isMalformed`      | function | Type guard, narrows `XmlNode` to `MalformedXmlNode` |
-| `XmlNode`          | type     | The shape of every node in the tree                 |
-| `XmlNodeRole`      | type     | Union of all valid role strings                     |
-| `XmlAttribute`     | type     | Shape of a parsed attribute `{ name, value }`       |
-| `MalformedXmlNode` | type     | `XmlNode` narrowed to `{ malformed: true }`         |
+| Export             | Kind     | Description                                             |
+| ------------------ | -------- | ------------------------------------------------------- |
+| `minify`           | function | Strips inter-tag whitespace from an XML string          |
+| `scaffold`         | function | Parses an XML string and returns a node tree            |
+| `walk`             | function | Traverses a node tree depth-first with a visitor        |
+| `render`           | function | Converts a node tree to an HTML string                  |
+| `isMalformed`      | function | Type guard that narrows `XmlNode` to `MalformedXmlNode` |
+| `XmlNode`          | type     | The shape of every node in the tree                     |
+| `XmlNodeRole`      | type     | Union of all valid role strings                         |
+| `XmlAttribute`     | type     | Shape of a parsed attribute `{ name, value }`           |
+| `MalformedXmlNode` | type     | `XmlNode` narrowed to nodes where `malformed` is `true` |
 
 ---
 
