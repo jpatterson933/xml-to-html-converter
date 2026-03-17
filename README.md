@@ -10,9 +10,9 @@ A zero-dependency Node.js package for converting XML to HTML. Currently in pre-1
 
 ---
 
-## v0.x.x: XML Node Extraction & Scaffolding
+## XML Node Extraction & Scaffolding
 
-Version `0.2.x` is focused entirely on parsing raw XML into a structured tree of nodes. The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
+The `scaffold` function walks an XML string and produces an array of `XmlNode` objects, each carrying its role, its raw source text, and its position in the document, both globally across the full document and locally within its parent.
 
 ```ts
 interface XmlAttribute {
@@ -50,6 +50,7 @@ This scaffold is the foundation everything else will be built on. No transformat
 >
 > `v0.x` is building the scaffold and the first render pass.
 >
+> - **`minify(xml)`** strips inter-tag whitespace from prettified XML before parsing — text content is left untouched
 > - **`scaffold(xml)`** reads any XML string and returns a nested node tree
 > - Every node knows its `role`, its `raw` source string, its `globalIndex` in the document, and its `localIndex` within its parent
 > - Tag nodes (`openTag`, `selfTag`) also carry `xmlTag`, `xmlInner`, and `xmlAttributes` — the parsed tag name, raw attribute string, and structured attribute array
@@ -164,6 +165,20 @@ Processing instructions and doctypes are dropped. Comments are passed through un
 
 ---
 
+### Minifying prettified XML
+
+When your XML comes from a file or an API it is usually indented and line-broken. `minify` strips the whitespace between tags before parsing, leaving text content completely untouched.
+
+```js
+import { minify, scaffold, render } from "xml-to-html-converter";
+
+const html = render(scaffold(minify(xml)));
+```
+
+`minify` is opt-in. Skip it if whitespace inside your content is meaningful.
+
+---
+
 ## Node Shape
 
 Every node in the tree has the following fields:
@@ -253,7 +268,7 @@ const tree = scaffold("<root><unclosed><valid>text</valid></root>");
 ## Exports
 
 ```ts
-import { scaffold, render, isMalformed } from "xml-to-html-converter";
+import { scaffold, render, minify, isMalformed } from "xml-to-html-converter";
 import type {
   XmlNode,
   XmlNodeRole,
@@ -264,6 +279,7 @@ import type {
 
 | Export             | Kind     | Description                                         |
 | ------------------ | -------- | --------------------------------------------------- |
+| `minify`           | function | Strips inter-tag whitespace from an XML string      |
 | `scaffold`         | function | Parses an XML string and returns a node tree        |
 | `render`           | function | Converts a node tree to an HTML string              |
 | `isMalformed`      | function | Type guard, narrows `XmlNode` to `MalformedXmlNode` |

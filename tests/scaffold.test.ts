@@ -456,6 +456,61 @@ describe("isMalformed type guard", () => {
   });
 });
 
+describe("sitemap fixture", () => {
+  const xml = readFileSync(
+    new URL("./fixtures/sitemap.xml", import.meta.url),
+    "utf-8",
+  );
+  const tokens = scaffold(xml);
+
+  it("parses without throwing and returns a non-empty tree", () => {
+    expect(() => scaffold(xml)).not.toThrow();
+    expect(tokens.length).toBeGreaterThan(0);
+  });
+
+  it("produces a single urlset root openTag", () => {
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].role).toBe("openTag");
+    expect(tokens[0].xmlTag).toBe("urlset");
+    expect(tokens[0].malformed).toBeUndefined();
+  });
+
+  it("produces url children inside urlset", () => {
+    const urlset = tokens[0];
+    expect(urlset.children?.length).toBeGreaterThan(0);
+    expect(urlset.children?.every((n) => n.xmlTag === "url")).toBe(true);
+  });
+
+  it("each url child has loc, lastmod, changefreq, and priority children", () => {
+    const urls = tokens[0].children ?? [];
+    for (const url of urls) {
+      const childTags = url.children?.map((c) => c.xmlTag) ?? [];
+      expect(childTags).toContain("loc");
+      expect(childTags).toContain("lastmod");
+      expect(childTags).toContain("changefreq");
+      expect(childTags).toContain("priority");
+    }
+  });
+
+  it("each loc contains a textLeaf with a non-empty URL string", () => {
+    const urls = tokens[0].children ?? [];
+    for (const url of urls) {
+      const loc = url.children?.find((c) => c.xmlTag === "loc");
+      const text = loc?.children?.find((c) => c.role === "textLeaf");
+      expect(text?.raw.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("surfaces no malformed nodes anywhere in the tree", () => {
+    const collectAll = (
+      nodes: ReturnType<typeof scaffold>,
+    ): ReturnType<typeof scaffold> =>
+      nodes.flatMap((n) => [n, ...collectAll(n.children ?? [])]);
+    const malformedNodes = collectAll(tokens).filter((n) => n.malformed);
+    expect(malformedNodes.length).toBe(0);
+  });
+});
+
 describe("max depth protection", () => {
   it("does not throw and marks the deepest open tag as malformed when nesting exceeds 500 levels", () => {
     const open = "<a>".repeat(501);
