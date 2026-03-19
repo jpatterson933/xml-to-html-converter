@@ -233,6 +233,24 @@ describe("comment detection", () => {
   });
 });
 
+describe("malformed attributes", () => {
+  it("marks a node malformed when an attribute value is unquoted", () => {
+    const tokens = scaffold("<tag attr=unquoted/>");
+    expect(tokens[0].malformed).toBe(true);
+  });
+
+  it("marks a node malformed when only some attributes parse before an unquoted one", () => {
+    const tokens = scaffold('<tag good="ok" bad=unquoted/>');
+    expect(tokens[0].malformed).toBe(true);
+    expect(tokens[0].xmlAttributes).toEqual([{ name: "good", value: "ok" }]);
+  });
+
+  it("does not mark a node malformed when all attributes are valid", () => {
+    const tokens = scaffold('<tag good="ok"/>');
+    expect(tokens[0].malformed).toBeUndefined();
+  });
+});
+
 describe("malformed input", () => {
   it("marks an unclosed openTag as malformed and keeps its collected children intact", () => {
     const tokens = scaffold("<a><unclosed><valid/></a>");
@@ -406,7 +424,6 @@ describe("edge cases", () => {
     expect(tokens[0].role).toBe("openTag");
     expect(tokens[0].raw).toBe("<");
     expect(tokens[0].malformed).toBe(true);
-    expect(tokens[0].raw).toBe("<");
   });
 
   it("produces a malformed closeTag node with empty tag for '</>'", () => {
@@ -424,7 +441,7 @@ describe("unclosed constructs", () => {
     expect(tokens.length).toBe(1);
     expect(tokens[0].role).toBe("processingInstruction");
     expect(tokens[0].raw).toBe("<?xml version='1.0'");
-    expect(tokens[0].malformed).toBeUndefined();
+    expect(tokens[0].malformed).toBe(true);
   });
 
   it("returns a comment node with full raw content when '-->' is never closed", () => {
@@ -432,7 +449,7 @@ describe("unclosed constructs", () => {
     expect(tokens.length).toBe(1);
     expect(tokens[0].role).toBe("comment");
     expect(tokens[0].raw).toBe("<!-- this comment never ends");
-    expect(tokens[0].malformed).toBeUndefined();
+    expect(tokens[0].malformed).toBe(true);
   });
 
   it("returns a textLeaf node with full raw CDATA content when ']]>' is never closed", () => {
@@ -440,7 +457,7 @@ describe("unclosed constructs", () => {
     expect(tokens.length).toBe(1);
     expect(tokens[0].role).toBe("textLeaf");
     expect(tokens[0].raw).toBe("<![CDATA[data without close");
-    expect(tokens[0].malformed).toBeUndefined();
+    expect(tokens[0].malformed).toBe(true);
   });
 });
 

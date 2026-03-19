@@ -10,7 +10,10 @@ interface XmlNodeData {
   malformed?: true;
 }
 
-function parseXmlAttributes(xmlInner: string): XmlAttribute[] | undefined {
+function parseXmlAttributes(xmlInner: string): {
+  attributes: XmlAttribute[] | undefined;
+  malformed: boolean;
+} {
   const attributes: XmlAttribute[] = [];
   let i = 0;
   const s = xmlInner.trim();
@@ -30,7 +33,12 @@ function parseXmlAttributes(xmlInner: string): XmlAttribute[] | undefined {
     while (i < s.length && /\s/.test(s[i]!)) i++;
 
     const quote = s[i];
-    if (quote !== '"' && quote !== "'") break;
+    if (quote !== '"' && quote !== "'") {
+      return {
+        attributes: attributes.length > 0 ? attributes : undefined,
+        malformed: true,
+      };
+    }
     i++;
     const valueStart = i;
     while (i < s.length && s[i] !== quote) i++;
@@ -40,7 +48,10 @@ function parseXmlAttributes(xmlInner: string): XmlAttribute[] | undefined {
     attributes.push({ name, value });
   }
 
-  return attributes.length > 0 ? attributes : undefined;
+  return {
+    attributes: attributes.length > 0 ? attributes : undefined,
+    malformed: false,
+  };
 }
 
 interface CollectResult {
@@ -171,6 +182,7 @@ function extractXmlNodes(xml: string, position: number): XmlNodeData {
           role: "processingInstruction",
           tag: "",
           end: xml.length,
+          malformed: true,
         }
       : {
           raw: xml.slice(position, end + 2),
@@ -183,7 +195,7 @@ function extractXmlNodes(xml: string, position: number): XmlNodeData {
   if (xml[position + 1] === "!" && xml[position + 2] === "[") {
     const end = xml.indexOf("]]>", position + 3);
     return end === -1
-      ? { raw: xml.slice(position), role: "textLeaf", tag: "", end: xml.length }
+      ? { raw: xml.slice(position), role: "textLeaf", tag: "", end: xml.length, malformed: true }
       : {
           raw: xml.slice(position, end + 3),
           role: "textLeaf",
@@ -199,7 +211,7 @@ function extractXmlNodes(xml: string, position: number): XmlNodeData {
   ) {
     const end = xml.indexOf("-->", position + 4);
     return end === -1
-      ? { raw: xml.slice(position), role: "comment", tag: "", end: xml.length }
+      ? { raw: xml.slice(position), role: "comment", tag: "", end: xml.length, malformed: true }
       : {
           raw: xml.slice(position, end + 3),
           role: "comment",
@@ -246,14 +258,14 @@ function extractXmlNodes(xml: string, position: number): XmlNodeData {
     const trimmed = inner.slice(0, -1).trim();
     const tag = trimmed.split(/\s/)[0] ?? "";
     const xmlInner = trimmed.slice(tag.length).trim() || undefined;
-    const xmlAttributes = xmlInner ? parseXmlAttributes(xmlInner) : undefined;
-    return { raw, role: "selfTag", tag, xmlInner, xmlAttributes, end };
+    const parsed = xmlInner ? parseXmlAttributes(xmlInner) : undefined;
+    return { raw, role: "selfTag", tag, xmlInner, xmlAttributes: parsed?.attributes, end, malformed: parsed?.malformed ? true : undefined };
   }
 
   const tag = inner.split(/\s/)[0] ?? "";
   const xmlInner = inner.slice(tag.length).trim() || undefined;
-  const xmlAttributes = xmlInner ? parseXmlAttributes(xmlInner) : undefined;
-  return { raw, role: "openTag", tag, xmlInner, xmlAttributes, end };
+  const parsed = xmlInner ? parseXmlAttributes(xmlInner) : undefined;
+  return { raw, role: "openTag", tag, xmlInner, xmlAttributes: parsed?.attributes, end, malformed: parsed?.malformed ? true : undefined };
 }
 
 export { scaffold };

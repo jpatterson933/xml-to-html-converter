@@ -172,7 +172,7 @@ const html = render(
 </div>
 ```
 
-Processing instructions and doctypes are dropped. Comments are passed through unchanged.
+Processing instructions and doctypes are dropped. Comments are passed through unchanged. The output is a raw HTML string — if you are inserting it into a web page, treat it accordingly.
 
 ---
 
@@ -228,11 +228,15 @@ Every node in the tree has the following fields:
 
 `scaffold` never throws. No matter what the input looks like, it always returns a complete tree. Malformed structures are flagged with `malformed: true` in place and the walk continues.
 
-Four cases are handled:
+Eight cases are handled:
 
 - **Unclosed tags** - opens but never closes, gets `malformed: true`, children are still collected
 - **Stray closing tags** - a `</tag>` with no matching open surfaces as a `closeTag` token with `malformed: true`
 - **Unclosed brackets** - a `<` with no matching `>` captures the remainder as a malformed token
+- **Unquoted attributes** - `<tag attr=unquoted>` flags the node `malformed: true`, any valid attributes parsed before the error are preserved
+- **Unclosed processing instructions** - `<?xml ...` with no `?>` captures the remainder as a malformed token
+- **Unclosed comments** - `<!-- ...` with no `-->` captures the remainder as a malformed token
+- **Unclosed CDATA** - `<![CDATA[ ...` with no `]]>` captures the remainder as a malformed token
 - **Excessive nesting** - documents nested beyond 500 levels have the deepest open tag flagged `malformed: true` to prevent a stack overflow
 
 ```js
