@@ -1,6 +1,6 @@
 function minify(xml: string): string {
   return xml
-    .replace(/>(\s+)</g, (_, gap) => (gap.trim() === "" ? "><" : `>${gap}<`))
+    .replace(/>(\s+)</g, "><")
     .trim();
 }
 
