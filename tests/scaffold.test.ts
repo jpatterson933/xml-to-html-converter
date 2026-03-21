@@ -249,6 +249,28 @@ describe("malformed attributes", () => {
     const tokens = scaffold('<tag good="ok"/>');
     expect(tokens[0].malformed).toBeUndefined();
   });
+
+  it("marks a node malformed when trailing junk appears after valid attributes", () => {
+    const tokens = scaffold('<tag good="ok" junk/>');
+    expect(tokens[0].malformed).toBe(true);
+    expect(tokens[0].xmlAttributes).toEqual([{ name: "good", value: "ok" }]);
+  });
+
+  it("marks a node malformed when attributes are not separated by whitespace", () => {
+    const tokens = scaffold('<tag good="ok"bad="nope"/>');
+    expect(tokens[0].malformed).toBe(true);
+    expect(tokens[0].xmlAttributes).toEqual([{ name: "good", value: "ok" }]);
+  });
+
+  it("parses mixed single-quoted and double-quoted attributes without marking malformed", () => {
+    const tokens = scaffold('<tag a="one" b=\'two\' c="three"/>');
+    expect(tokens[0].malformed).toBeUndefined();
+    expect(tokens[0].xmlAttributes).toEqual([
+      { name: "a", value: "one" },
+      { name: "b", value: "two" },
+      { name: "c", value: "three" },
+    ]);
+  });
 });
 
 describe("malformed input", () => {
@@ -286,6 +308,18 @@ describe("malformed input", () => {
     expect(() => scaffold("</a>")).not.toThrow();
     expect(() => scaffold("<a><b></a></b>")).not.toThrow();
     expect(() => scaffold("just text")).not.toThrow();
+  });
+
+  it("keeps parsing through mismatched close tags and marks involved nodes malformed", () => {
+    const tokens = scaffold("<a><b></a></c>");
+    const a = tokens[0];
+    const b = a.children?.[0];
+    expect(a.role).toBe("openTag");
+    expect(a.malformed).toBe(true);
+    expect(b?.role).toBe("openTag");
+    expect(b?.malformed).toBe(true);
+    expect(b?.children?.map((child) => child.raw)).toEqual(["</a>", "</c>"]);
+    expect(b?.children?.every((child) => child.malformed === true)).toBe(true);
   });
 });
 

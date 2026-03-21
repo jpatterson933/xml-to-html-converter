@@ -8,7 +8,7 @@
 
 A zero-dependency Node.js package for converting XML to HTML.
 
-- **`minify(xml)`** strips inter-tag whitespace from prettified XML before parsing. Text content is left untouched
+- **`minify(xml)`** removes prettification whitespace between markup tokens before parsing. Non-whitespace text content and CDATA are left untouched
 - **`scaffold(xml)`** reads any XML string and returns a nested node tree
 - **`walk(nodes, visitor)`** traverses the full node tree depth-first, visiting every node
 - **`render(nodes)`** converts a node tree to an HTML string. Every XML element becomes a `<div>` with `data-tag` and `data-attrs-*` attributes
@@ -27,7 +27,7 @@ npm install xml-to-html-converter
 
 ### minify
 
-When your XML comes from a file or an API it is usually indented and line-broken. `minify` strips the whitespace between tags before parsing. Text content is left completely untouched.
+When your XML comes from a file or an API it is usually indented and line-broken. `minify` removes whitespace-only text nodes that include line breaks when they appear between markup tokens. Text content and CDATA are left completely untouched.
 
 ```js
 import { minify } from "xml-to-html-converter";
@@ -42,7 +42,7 @@ const clean = minify(`
 // <bookstore><book category="cooking"><title lang="en">Everyday Italian</title></book></bookstore>
 ```
 
-`minify` is opt-in. Skip it if whitespace inside your content is meaningful.
+`minify` is opt-in. Skip it if whitespace-only nodes between markup tokens are meaningful to your use case.
 
 ---
 
@@ -233,7 +233,7 @@ Eight cases are handled:
 - **Unclosed tags** - opens but never closes, gets `malformed: true`, children are still collected
 - **Stray closing tags** - a `</tag>` with no matching open surfaces as a `closeTag` token with `malformed: true`
 - **Unclosed brackets** - a `<` with no matching `>` captures the remainder as a malformed token
-- **Unquoted attributes** - `<tag attr=unquoted>` flags the node `malformed: true`, any valid attributes parsed before the error are preserved
+- **Malformed attributes** - unquoted values (`<tag attr=unquoted>`), invalid separators (`<tag a="1"b="2">`), trailing junk after valid attributes (`<tag a="1" junk>`), and unclosed quoted values all flag the node `malformed: true`; any valid attributes parsed before the error are preserved
 - **Unclosed processing instructions** - `<?xml ...` with no `?>` captures the remainder as a malformed token
 - **Unclosed comments** - `<!-- ...` with no `-->` captures the remainder as a malformed token
 - **Unclosed CDATA** - `<![CDATA[ ...` with no `]]>` captures the remainder as a malformed token
