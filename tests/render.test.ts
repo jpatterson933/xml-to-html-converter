@@ -10,17 +10,23 @@ describe("openTag rendering", () => {
 
   it("renders an openTag with a single attribute as data-attrs-{name}", () => {
     const html = render(scaffold('<book category="cooking"></book>'));
-    expect(html).toBe('<div data-tag="book" data-attrs-category="cooking"></div>');
+    expect(html).toBe(
+      '<div data-tag="book" data-attrs-category="cooking"></div>',
+    );
   });
 
   it("renders an openTag with multiple attributes as separate data-attrs-{name} entries", () => {
     const html = render(scaffold('<title lang="en" dir="ltr"></title>'));
-    expect(html).toBe('<div data-tag="title" data-attrs-lang="en" data-attrs-dir="ltr"></div>');
+    expect(html).toBe(
+      '<div data-tag="title" data-attrs-lang="en" data-attrs-dir="ltr"></div>',
+    );
   });
 
   it("renders children nested inside the parent div", () => {
     const html = render(scaffold("<root><child/></root>"));
-    expect(html).toBe('<div data-tag="root"><div data-tag="child"></div></div>');
+    expect(html).toBe(
+      '<div data-tag="root"><div data-tag="child"></div></div>',
+    );
   });
 
   it("renders deeply nested children in correct order", () => {
@@ -89,6 +95,18 @@ describe("dropped node roles", () => {
     expect(html).not.toContain("orphan");
     expect(html).toContain('data-tag="a"');
     expect(html).toContain('data-tag="b"');
+  });
+});
+
+describe("raw output contract", () => {
+  it("renders xml attribute values verbatim without HTML escaping", () => {
+    const html = render(scaffold('<node text="a&b"></node>'));
+    expect(html).toBe('<div data-tag="node" data-attrs-text="a&b"></div>');
+  });
+
+  it("renders textLeaf content verbatim without escaping", () => {
+    const html = render(scaffold("<p>a &amp; b</p>"));
+    expect(html).toBe('<div data-tag="p">a &amp; b</div>');
   });
 });
 

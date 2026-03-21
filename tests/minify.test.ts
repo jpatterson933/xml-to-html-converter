@@ -29,6 +29,21 @@ describe("text content preservation", () => {
     expect(minify(xml)).toBe("<root><p>hello world</p></root>");
   });
 
+  it("does not collapse spaces between literal > and < characters inside text content", () => {
+    const xml = "<p>2 >   < 3</p>";
+    expect(minify(xml)).toBe("<p>2 >   < 3</p>");
+  });
+
+  it("does not collapse newline-separated > and < characters inside text content", () => {
+    const xml = "<p>2 >\n< 3</p>";
+    expect(minify(xml)).toBe("<p>2 >\n< 3</p>");
+  });
+
+  it("does not modify newline content inside CDATA", () => {
+    const xml = "<p><![CDATA[a>\n< b]]></p>";
+    expect(minify(xml)).toBe("<p><![CDATA[a>\n< b]]></p>");
+  });
+
   it("preserves multiple spaces inside text content", () => {
     const xml = "<root>\n  <p>hello   world</p>\n</root>";
     expect(minify(xml)).toBe("<root><p>hello   world</p></root>");
@@ -51,6 +66,38 @@ describe("edge cases", () => {
 
   it("handles a single self-closing tag with no surrounding whitespace", () => {
     expect(minify("<br/>")).toBe("<br/>");
+  });
+
+  it("keeps malformed markup constructs intact and only trims document edges", () => {
+    const malformedInputs = [
+      "<root",
+      "<!-- never closed",
+      "<?xml version='1.0'",
+      "<![CDATA[never closed",
+    ];
+    for (const xml of malformedInputs) {
+      expect(minify(`\n${xml}\n`)).toBe(xml);
+    }
+  });
+
+  it("keeps doctype internal subset content untouched while removing surrounding prettification", () => {
+    const xml = `<!DOCTYPE root [
+<!ELEMENT root (#PCDATA)>
+]>
+<root>
+  <child/>
+</root>`;
+    expect(minify(xml)).toBe(
+      "<!DOCTYPE root [\n<!ELEMENT root (#PCDATA)>\n]><root><child/></root>",
+    );
+  });
+
+  it("removes newline gaps around comments but preserves comment body exactly", () => {
+    const xml = `<a/>
+<!-- line 1
+line 2 -->
+<b/>`;
+    expect(minify(xml)).toBe("<a/><!-- line 1\nline 2 --><b/>");
   });
 });
 
