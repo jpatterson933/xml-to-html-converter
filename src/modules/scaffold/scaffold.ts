@@ -101,11 +101,6 @@ function collectXmlNodes(
   while (position < xml.length) {
     const xmlNodeData = extractXmlNodes(xml, position);
 
-    if (xmlNodeData.role === "textLeaf" && xmlNodeData.raw.trim() === "") {
-      position = xmlNodeData.end;
-      continue;
-    }
-
     if (xmlNodeData.role === "closeTag") {
       if (xmlNodeData.tag === parentTag)
         return { xmlNodes, position: xmlNodeData.end, closed: true };

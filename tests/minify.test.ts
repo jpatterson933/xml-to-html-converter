@@ -102,16 +102,43 @@ line 2 -->
 });
 
 describe("scaffold integration", () => {
-  it("produces the same tree shape before and after minify on prettified xml", () => {
-    const pretty = `
+  const pretty = `
       <bookstore>
         <book category="cooking">
           <title lang="en">Everyday Italian</title>
         </book>
       </bookstore>
     `;
-    const fromPretty = scaffold(pretty);
-    const fromMinified = scaffold(minify(pretty));
-    expect(JSON.stringify(fromMinified)).toBe(JSON.stringify(fromPretty));
+  const collectAll = (
+    nodes: ReturnType<typeof scaffold>,
+  ): ReturnType<typeof scaffold> =>
+    nodes.flatMap((n) => [n, ...collectAll(n.children ?? [])]);
+  const isWhitespaceLeaf = (n: ReturnType<typeof scaffold>[number]) =>
+    n.role === "textLeaf" && n.raw.trim() === "";
+
+  it("scaffold keeps prettification whitespace as textLeaf nodes when minify is not applied", () => {
+    const whitespace = collectAll(scaffold(pretty)).filter(isWhitespaceLeaf);
+    expect(whitespace.length).toBeGreaterThan(0);
+  });
+
+  it("scaffold produces no whitespace-only textLeaf nodes after minify", () => {
+    const whitespace = collectAll(scaffold(minify(pretty))).filter(
+      isWhitespaceLeaf,
+    );
+    expect(whitespace.length).toBe(0);
+  });
+
+  it("minify changes only whitespace-only nodes, never element or text content", () => {
+    type Node = ReturnType<typeof scaffold>[number];
+    const strip = (nodes: Node[]): unknown[] =>
+      nodes
+        .filter((n) => !isWhitespaceLeaf(n))
+        .map((n) => ({
+          role: n.role,
+          raw: n.raw,
+          xmlAttributes: n.xmlAttributes,
+          children: n.children ? strip(n.children) : undefined,
+        }));
+    expect(strip(scaffold(minify(pretty)))).toEqual(strip(scaffold(pretty)));
   });
 });

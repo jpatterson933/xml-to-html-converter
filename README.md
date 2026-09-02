@@ -9,7 +9,7 @@
 A zero-dependency Node.js package for converting XML to HTML.
 
 - **`minify(xml)`** removes prettification whitespace between markup tokens before parsing. Non-whitespace text content and CDATA are left untouched
-- **`scaffold(xml)`** reads any XML string and returns a nested node tree
+- **`scaffold(xml)`** reads any XML string and returns a nested node tree. Every text node is kept, including whitespace-only text between tags
 - **`walk(nodes, visitor)`** traverses the full node tree depth-first, visiting every node
 - **`render(nodes)`** converts a node tree to an HTML string. Every XML element becomes a `<div>` with `data-tag` and `data-attrs-*` attributes
 
@@ -42,7 +42,7 @@ const clean = minify(`
 // <bookstore><book category="cooking"><title lang="en">Everyday Italian</title></book></bookstore>
 ```
 
-`minify` is opt-in. Skip it if whitespace-only nodes between markup tokens are meaningful to your use case.
+`minify` is opt-in. `scaffold` on its own keeps every whitespace-only text node as a `textLeaf`, so skip `minify` if that whitespace is meaningful to your use case. Only whitespace that contains a line break is removed. A single space between inline elements, such as `</b> <i>`, is kept by both functions.
 
 ---
 
@@ -50,17 +50,21 @@ const clean = minify(`
 
 `scaffold` parses an XML string into a structured tree of `XmlNode` objects. Each node carries its role, its raw source text, and its position in the document both globally across the full document and locally within its parent.
 
-```js
-import { scaffold } from "xml-to-html-converter";
+`scaffold` keeps every text node, including whitespace-only text between tags. Pretty-printed XML therefore produces `textLeaf` nodes for its indentation. The example below runs the input through `minify` first so the tree contains only markup and meaningful text.
 
-const tree = scaffold(`
+```js
+import { minify, scaffold } from "xml-to-html-converter";
+
+const tree = scaffold(
+  minify(`
   <?xml version="1.0" encoding="UTF-8"?>
   <bookstore>
     <book category="cooking">
       <title lang="en">Everyday Italian</title>
     </book>
   </bookstore>
-`);
+`),
+);
 ```
 
 `scaffold` returns a flat array of root-level nodes. Each `openTag` node carries its children nested inside it:
@@ -172,7 +176,9 @@ const html = render(
 </div>
 ```
 
-Processing instructions and doctypes are dropped. Comments are passed through unchanged. The output is a raw HTML string — if you are inserting it into a web page, treat it accordingly.
+Processing instructions and doctypes are dropped. Comments are passed through unchanged. CDATA sections are unwrapped and their content is emitted as text with `<`, `>`, and `&` escaped so it displays literally. Double quotes inside attribute values are written as `&quot;` so the HTML attribute stays intact. All other text and attribute values are emitted verbatim. Whitespace-only `textLeaf` nodes are emitted as-is, so run the input through `minify` first if you want compact output.
+
+The output is a raw HTML string. If you are inserting it into a web page, treat it accordingly.
 
 ---
 
@@ -212,15 +218,15 @@ Every node in the tree has the following fields:
 
 ## Node Roles
 
-| Role                    | Has children | Description                                         |
-| ----------------------- | ------------ | --------------------------------------------------- |
-| `openTag`               | yes          | An opening tag, e.g. `<book category="web">`        |
-| `selfTag`               | no           | A self-closing tag, e.g. `<br/>`                    |
-| `closeTag`              | no           | Only appears when stray (no matching open)          |
-| `processingInstruction` | no           | e.g. `<?xml version="1.0"?>`                        |
-| `comment`               | no           | e.g. `<!-- a comment -->`                           |
-| `textLeaf`              | no           | Text content between tags, including CDATA sections |
-| `doctype`               | no           | e.g. `<!DOCTYPE html>` or `<!DOCTYPE root [...]>`   |
+| Role                    | Has children | Description                                                                  |
+| ----------------------- | ------------ | ---------------------------------------------------------------------------- |
+| `openTag`               | yes          | An opening tag, e.g. `<book category="web">`                                 |
+| `selfTag`               | no           | A self-closing tag, e.g. `<br/>`                                             |
+| `closeTag`              | no           | Only appears when stray (no matching open)                                   |
+| `processingInstruction` | no           | e.g. `<?xml version="1.0"?>`                                                 |
+| `comment`               | no           | e.g. `<!-- a comment -->`                                                    |
+| `textLeaf`              | no           | Text content between tags, including whitespace-only text and CDATA sections |
+| `doctype`               | no           | e.g. `<!DOCTYPE html>` or `<!DOCTYPE root [...]>`                            |
 
 ---
 

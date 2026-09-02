@@ -15,7 +15,11 @@ git checkout main
 git pull origin main
 ```
 
-### 2. Bump the version
+### 2. Update the changelog
+
+Rename the `Unreleased` heading in `CHANGELOG.md` to the version you are about to publish and add today's date. Every user-visible change should already be listed there from the PRs that introduced it.
+
+### 3. Bump the version
 
 Run ONE of these commands in your terminal:
 
@@ -31,13 +35,13 @@ This command does three things automatically:
 - Creates a git commit (e.g., "v1.0.1")
 - Creates a git tag (e.g., `v1.0.1`)
 
-### 3. Push the commit and tag
+### 4. Push the commit and tag
 
 ```bash
 git push origin main --tags
 ```
 
-### 4. Create the GitHub Release
+### 5. Create the GitHub Release
 
 1. Go to the repo on GitHub
 2. Click **Releases** (right sidebar)
