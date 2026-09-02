@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
-import { render, scaffold } from "../src/index";
+import { minify, render, scaffold } from "../src/index";
 
 describe("openTag rendering", () => {
   it("renders an openTag with no attributes as a div with only data-tag", () => {
@@ -141,5 +141,73 @@ describe("round-trip: scaffold → render", () => {
     expect(html).toContain('data-tag="p:departing"');
     expect(html).toContain("New York");
     expect(html).toContain("Fred Bloggs");
+  });
+});
+
+describe("CDATA rendering", () => {
+  it("renders CDATA content as literal text with markup characters escaped", () => {
+    const html = render(scaffold("<code><![CDATA[x < y && y > z]]></code>"));
+    expect(html).toBe('<div data-tag="code">x &lt; y &amp;&amp; y &gt; z</div>');
+  });
+
+  it("does not emit the CDATA wrapper for an unclosed CDATA section", () => {
+    const html = render(scaffold("<code><![CDATA[a < b"));
+    expect(html).toContain("a &lt; b");
+    expect(html).not.toContain("<![CDATA[");
+  });
+
+  it("leaves text that is not CDATA untouched, including existing entities", () => {
+    const html = render(scaffold("<p>a &amp; b &lt; c</p>"));
+    expect(html).toBe('<div data-tag="p">a &amp; b &lt; c</div>');
+  });
+
+  it("renders the cdata fixture without leaking CDATA markers into the HTML", () => {
+    const xml = readFileSync(
+      new URL("./fixtures/cdata.xml", import.meta.url),
+      "utf-8",
+    );
+    const html = render(scaffold(minify(xml)));
+    expect(html).not.toContain("<![CDATA[");
+    expect(html).not.toContain("]]>");
+    expect(html).toContain("x &lt; y &amp;&amp; y &gt; z");
+    expect(html).toContain("Use &lt;b&gt;bold&lt;/b&gt; &amp; \"quotes\" freely inside CDATA");
+  });
+});
+
+describe("attribute value quoting", () => {
+  it("escapes double quotes inside attribute values", () => {
+    const html = render(scaffold(`<a title='say "hi"'/>`));
+    expect(html).toBe(
+      '<div data-tag="a" data-attrs-title="say &quot;hi&quot;"></div>',
+    );
+  });
+
+  it("leaves single quotes and existing entities in attribute values untouched", () => {
+    const html = render(scaffold(`<a title="it's &amp; ok"/>`));
+    expect(html).toBe(
+      `<div data-tag="a" data-attrs-title="it's &amp; ok"></div>`,
+    );
+  });
+});
+
+describe("whitespace pass-through", () => {
+  const pretty = "<root>\n  <child/>\n</root>";
+
+  it("emits whitespace textLeaf nodes between elements when scaffold is used without minify", () => {
+    expect(render(scaffold(pretty))).toBe(
+      '<div data-tag="root">\n  <div data-tag="child"></div>\n</div>',
+    );
+  });
+
+  it("emits compact HTML when the input is minified first", () => {
+    expect(render(scaffold(minify(pretty)))).toBe(
+      '<div data-tag="root"><div data-tag="child"></div></div>',
+    );
+  });
+
+  it("preserves the space between inline sibling elements", () => {
+    expect(render(scaffold("<p>Hello <b>big</b> <i>world</i></p>"))).toBe(
+      '<div data-tag="p">Hello <div data-tag="b">big</div> <div data-tag="i">world</div></div>',
+    );
   });
 });

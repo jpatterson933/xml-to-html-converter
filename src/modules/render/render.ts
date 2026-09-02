@@ -5,7 +5,7 @@ function render(nodes: XmlNode[]): string {
 }
 
 function renderNode(node: XmlNode): string {
-  if (node.role === "textLeaf") return node.raw;
+  if (node.role === "textLeaf") return renderText(node.raw);
   if (node.role === "comment") return node.raw;
   if (node.role === "processingInstruction") return "";
   if (node.role === "doctype") return "";
@@ -26,8 +26,20 @@ function renderNode(node: XmlNode): string {
 function buildDataAttrs(node: XmlNode): string {
   if (!node.xmlAttributes || node.xmlAttributes.length === 0) return "";
   return node.xmlAttributes
-    .map(({ name, value }) => `data-attrs-${name}="${value}"`)
+    .map(
+      ({ name, value }) =>
+        `data-attrs-${name}="${value.replace(/"/g, "&quot;")}"`,
+    )
     .join(" ");
+}
+
+function renderText(raw: string): string {
+  if (!raw.startsWith("<![CDATA[")) return raw;
+  const inner = raw.endsWith("]]>") ? raw.slice(9, -3) : raw.slice(9);
+  return inner
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 export { render };

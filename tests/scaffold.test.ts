@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
-import { isMalformed, scaffold } from "../src/index";
+import { isMalformed, minify, scaffold } from "../src/index";
 // -----------------------------------------------------------------------------
 // Node shape reference:
 //
@@ -324,7 +324,30 @@ describe("malformed input", () => {
 });
 
 describe("whitespace handling", () => {
-  it("does not produce textLeaf nodes for whitespace-only content between tags", () => {
+  const collectAll = (
+    nodes: ReturnType<typeof scaffold>,
+  ): ReturnType<typeof scaffold> =>
+    nodes.flatMap((n) => [n, ...collectAll(n.children ?? [])]);
+  const isWhitespaceLeaf = (n: ReturnType<typeof scaffold>[number]) =>
+    n.role === "textLeaf" && n.raw.trim() === "";
+
+  it("preserves whitespace-only text between tags as textLeaf nodes", () => {
+    const xml = "<page>\n  <header>\n    <nav/>\n  </header>\n</page>";
+    const page = scaffold(xml)[0];
+    expect(page.children?.map((c) => c.raw)).toEqual([
+      "\n  ",
+      "<header>",
+      "\n",
+    ]);
+    const header = page.children?.[1];
+    expect(header?.children?.map((c) => c.raw)).toEqual([
+      "\n    ",
+      "<nav/>",
+      "\n  ",
+    ]);
+  });
+
+  it("produces no whitespace-only textLeaf nodes when the input is passed through minify first", () => {
     const xml = `
       <page>
         <header>
@@ -335,49 +358,71 @@ describe("whitespace handling", () => {
         </main>
       </page>
     `;
-    const tokens = scaffold(xml);
-    const allNodes: typeof tokens = [];
-    const collect = (nodes: typeof tokens) => {
-      for (const node of nodes) {
-        allNodes.push(node);
-        if (node.children) collect(node.children);
-      }
-    };
-    collect(tokens);
-    const whitespaceLeafs = allNodes.filter(
-      (n) => n.role === "textLeaf" && n.raw.trim() === "",
-    );
-    expect(whitespaceLeafs.length).toBe(0);
+    const tokens = scaffold(minify(xml));
+    expect(collectAll(tokens).filter(isWhitespaceLeaf).length).toBe(0);
+    expect(tokens[0].children?.map((c) => c.xmlTag)).toEqual([
+      "header",
+      "main",
+    ]);
   });
 
-  it("preserves meaningful text content inside a tag while stripping structural whitespace between tags", () => {
+  it("preserves a single space between inline sibling elements", () => {
+    const p = scaffold("<p>Hello <b>big</b> <i>world</i></p>")[0];
+    expect(p.children?.map((c) => c.raw)).toEqual([
+      "Hello ",
+      "<b>",
+      " ",
+      "<i>",
+    ]);
+  });
+
+  it("preserves whitespace-only content inside an element", () => {
+    const pre = scaffold("<pre>   </pre>")[0];
+    expect(pre.children?.length).toBe(1);
+    expect(pre.children?.[0].role).toBe("textLeaf");
+    expect(pre.children?.[0].raw).toBe("   ");
+  });
+
+  it("keeps leading and trailing document whitespace as root-level textLeaf nodes", () => {
+    const tokens = scaffold("\n  <root/>\n");
+    expect(tokens.map((t) => t.role)).toEqual([
+      "textLeaf",
+      "selfTag",
+      "textLeaf",
+    ]);
+    expect(tokens[0].raw).toBe("\n  ");
+    expect(tokens[1].raw).toBe("<root/>");
+    expect(tokens[2].raw).toBe("\n");
+  });
+
+  it("assigns globalIndex and localIndex to whitespace textLeaf nodes like any other node", () => {
+    const a = scaffold("<a>\n<b/>\n</a>")[0];
+    expect(a.globalIndex).toBe(0);
+    expect(
+      a.children?.map((c) => [c.role, c.globalIndex, c.localIndex]),
+    ).toEqual([
+      ["textLeaf", 1, 0],
+      ["selfTag", 2, 1],
+      ["textLeaf", 3, 2],
+    ]);
+  });
+
+  it("preserves meaningful text content inside a tag when structural whitespace is minified away", () => {
     const xml = `
       <root>
         <h1> hey peeps </h1>
         <p>some content</p>
       </root>
     `;
-    const tokens = scaffold(xml);
-    const root = tokens[0];
+    const root = scaffold(minify(xml))[0];
     expect(root.role).toBe("openTag");
     expect(root.children?.length).toBe(2);
     const h1 = root.children?.[0];
-    expect(h1?.role).toBe("openTag");
     expect(h1?.raw).toBe("<h1>");
     expect(h1?.children?.length).toBe(1);
     expect(h1?.children?.[0].role).toBe("textLeaf");
     expect(h1?.children?.[0].raw).toBe(" hey peeps ");
-    const p = root.children?.[1];
-    expect(p?.role).toBe("openTag");
-    expect(p?.raw).toBe("<p>");
-  });
-
-  it("strips leading and trailing whitespace from the entire input before parsing", () => {
-    const xml = "\n  <root/>\n";
-    const tokens = scaffold(xml);
-    expect(tokens.length).toBe(1);
-    expect(tokens[0].role).toBe("selfTag");
-    expect(tokens[0].raw).toBe("<root/>");
+    expect(root.children?.[1].raw).toBe("<p>");
   });
 
   it("preserves multiple spaces between words inside a text node", () => {
@@ -397,13 +442,6 @@ describe("whitespace handling", () => {
     expect(children[1].raw).toBe("<strong>");
     expect(children[2].role).toBe("textLeaf");
     expect(children[2].raw).toBe(" today");
-  });
-
-  it("drops a tag that contains only whitespace as its text content", () => {
-    const tokens = scaffold("<p>   </p>");
-    const p = tokens[0];
-    expect(p.role).toBe("openTag");
-    expect(p.children?.length).toBe(0);
   });
 });
 
@@ -512,7 +550,7 @@ describe("sitemap fixture", () => {
     new URL("./fixtures/sitemap.xml", import.meta.url),
     "utf-8",
   );
-  const tokens = scaffold(xml);
+  const tokens = scaffold(minify(xml));
 
   it("parses without throwing and returns a non-empty tree", () => {
     expect(() => scaffold(xml)).not.toThrow();
@@ -682,7 +720,7 @@ describe("xmlInner field", () => {
       new URL("./fixtures/SOAP.xml", import.meta.url),
       "utf-8",
     );
-    const tokens = scaffold(xml);
+    const tokens = scaffold(minify(xml));
     const header = tokens[1].children?.[0];
     const reservation = header?.children?.[0];
     expect(reservation?.xmlInner).toBe(
@@ -733,7 +771,7 @@ describe("xmlAttributes field", () => {
       new URL("./fixtures/SOAP.xml", import.meta.url),
       "utf-8",
     );
-    const tokens = scaffold(xml);
+    const tokens = scaffold(minify(xml));
     const header = tokens[1].children?.[0];
     const reservation = header?.children?.[0];
     expect(reservation?.xmlAttributes).toEqual([
@@ -792,7 +830,7 @@ describe("SOAP envelope", () => {
     new URL("./fixtures/SOAP.xml", import.meta.url),
     "utf-8",
   );
-  const tokens = scaffold(xml);
+  const tokens = scaffold(minify(xml));
 
   it("parses the SOAP envelope as a single root openTag with a namespace-prefixed tag name", () => {
     expect(tokens.length).toBe(2);
